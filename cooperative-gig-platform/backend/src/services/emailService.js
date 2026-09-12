@@ -16,6 +16,12 @@ const getTransporter = () => {
         user: env.emailUser,
         pass: env.emailAppPassword,
       },
+      // Fail fast instead of hanging the register request for the SMTP layer's
+      // default ~2min. A blocked/unreachable relay should surface a 502 in a
+      // few seconds, not leave the user stuck on a spinner.
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
     });
   }
   return transporter;
