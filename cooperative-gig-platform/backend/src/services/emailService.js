@@ -11,7 +11,10 @@ let transporter = null;
 const getTransporter = () => {
   if (!transporter) {
     transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587, // STARTTLS — 465 (implicit TLS) is frequently blocked by hosts
+      secure: false,
+      requireTLS: true,
       auth: {
         user: env.emailUser,
         pass: env.emailAppPassword,
