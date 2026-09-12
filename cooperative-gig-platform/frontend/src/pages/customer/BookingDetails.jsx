@@ -612,7 +612,7 @@ export default function BookingDetails() {
               {paying ? t('common.loading') : t('book.payNow')}
             </button>
           )}
-          {['REQUESTED', 'MATCHING'].includes(booking.status) && (
+          {['REQUESTED', 'MATCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(booking.status) && (
             <button onClick={openCancel} className="btn-danger text-sm">{t('book.cancelBooking')}</button>
           )}
           {booking.status === 'COMPLETED' && (

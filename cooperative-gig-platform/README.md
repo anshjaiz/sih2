@@ -17,7 +17,7 @@ A cooperative-owned gig services platform for household & community services. Un
 
 ### Backend
 - **Node.js + Express.js**
-- **MongoDB + Mongoose** (local MongoDB)
+- **MongoDB Atlas + Mongoose** (cloud MongoDB)
 - **JWT** — authentication
 - **bcryptjs** — password hashing
 - **Multer** — file/image uploads
@@ -29,23 +29,24 @@ A cooperative-owned gig services platform for household & community services. Un
 
 1. **Node.js** (v18+)
    - Download from https://nodejs.org
-2. **MongoDB** (local)
-   - Download MongoDB Community Server from https://www.mongodb.com/try/download/community
-   - Or install via Homebrew: `brew tap mongodb/brew && brew install mongodb-community`
+2. **MongoDB Atlas** (cloud database — no local MongoDB needed)
+   - Create a free account and a free M0 cluster at https://www.mongodb.com/cloud/atlas
+   - **Database Access** → add a DB user (username + password)
+   - **Network Access** → allow your IP (or `0.0.0.0/0` for demos)
+   - **Connect → Drivers** → copy your `mongodb+srv://...` connection string
 
 ---
 
 ## 🚀 Setup & Run
 
-### 1. Start MongoDB
+### 1. MongoDB Atlas (cloud)
 
-```bash
-# Homebrew (macOS)
-brew services start mongodb-community
+No local MongoDB installation is required. The backend connects directly to your Atlas cluster using the `MONGO_URI` in `backend/.env`. You only need:
 
-# Or run mongod directly
-mongod --dbpath /path/to/data/db
-```
+- a free M0 cluster created (see Prerequisites above), and
+- your cluster connection string pasted into `MONGO_URI` (see Environment Variables below).
+
+The app uses the `cooperative_gig_platform` database inside your cluster. You can seed it once with `npm run seed` (kept optional below because it only needs to run on first setup).
 
 ### 2. Backend
 
@@ -80,7 +81,9 @@ Create `backend/.env` based on `backend/.env.example`:
 
 ```
 PORT=5001
-MONGO_URI=mongodb://127.0.0.1:27017/cooperative_gig_platform
+# MongoDB Atlas connection string (from Connect → Drivers in your Atlas console).
+# Replace <db_user>, <db_password> and <cluster-name> with your values.
+MONGO_URI=mongodb+srv://<db_user>:<db_password>@<cluster-name>.mongodb.net/cooperative_gig_platform?retryWrites=true&w=majority
 JWT_SECRET=your_super_secret_key
 JWT_EXPIRES_IN=7d
 ```
