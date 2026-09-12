@@ -30,6 +30,7 @@ const ReliabilityEvent = require('../../models/ReliabilityEvent');
 const { getSettings } = require('./reliabilityConfig');
 const { matchWorkersForBooking } = require('../matching/matchingService');
 const { createNotification, notifyUsers } = require('../notification/notificationService');
+const { logAudit, ACTIONS } = require('../audit/auditLogService');
 
 /**
  * Derive the reliability level for a score using configured thresholds.
@@ -218,6 +219,32 @@ const applyScoreChange = async ({
         data: { accountStatus, score: newScore },
       });
     }
+  }
+
+  if (points !== 0) {
+    // Audit every non-trivial score change so the admin trail is complete.
+    const wpUserForAudit = await Worker.findById(workerId)
+      .select('user')
+      .lean()
+      .catch(() => null);
+    await logAudit({
+      action: ACTIONS.MERIT_SCORE_CHANGED,
+      performedBy: admin,
+      targetUser: wpUserForAudit?.user ?? null,
+      targetRole: 'worker',
+      targetProfile: workerId,
+      booking: bookingId,
+      reason: reason || '',
+      metadata: {
+        eventType,
+        points,
+        previousScore,
+        newScore,
+        level,
+        accountStatus,
+        ...metadata,
+      },
+    });
   }
 
   return {

@@ -4,12 +4,14 @@ const {
   getDashboard,
   getBookings,
   getCustomerProfile,
+  getCustomerCancellations,
   updateCustomerProfile,
 } = require('../controllers/customer/customerController');
 const {
   createServiceRequest,
   getBookingById,
   cancelBooking,
+  previewCancellation,
   requestReassignment,
 } = require('../controllers/customer/bookingController');
 const {
@@ -51,11 +53,15 @@ router.post('/ai-assistant/chat', protect, aiChatLimiter, chatHandler);
 router.get('/profile', protect, getCustomerProfile);
 router.put('/profile', protect, updateCustomerProfile);
 
+// Cancellation history (profile / suspension screen)
+router.get('/cancellations', protect, getCustomerCancellations);
+
 // Bookings
 router.get('/bookings', protect, getBookings);
 router.post('/bookings', protect, upload.array('images', 5), createServiceRequest);
 router.get('/bookings/:id', protect, getBookingById);
 router.put('/bookings/:id/cancel', protect, cancelBooking);
+router.post('/bookings/:id/cancel-preview', protect, previewCancellation);
 router.post('/bookings/:id/reassign', protect, requestReassignment);
 router.post('/bookings/:id/confirm', protect, confirmCompletion);
 router.post('/bookings/:id/material-request/:requestId/approve', protect, approveMaterialRequest);

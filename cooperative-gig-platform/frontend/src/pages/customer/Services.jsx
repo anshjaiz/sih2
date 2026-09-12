@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 
@@ -11,11 +11,15 @@ const categoryIcons = {
 
 export default function Services() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [loading, setLoading] = useState(true);
+  const searchBoxRef = useRef(null);
 
   useEffect(() => {
     const load = async () => {
@@ -34,11 +38,54 @@ export default function Services() {
     load();
   }, []);
 
+  const matches = services.filter((s) => {
+    const matchCat = selectedCategory === 'All' || s.category === selectedCategory;
+    const q = search.trim().toLowerCase();
+    const matchSearch =
+      !q ||
+      s.name.toLowerCase().includes(q) ||
+      s.category.toLowerCase().includes(q) ||
+      (s.description || '').toLowerCase().includes(q);
+    return matchCat && matchSearch;
+  });
+
+  const suggestions = matches.slice(0, 8);
+
   const filtered = services.filter((s) => {
     const matchCat = selectedCategory === 'All' || s.category === selectedCategory;
     const matchSearch = !search || s.name.toLowerCase().includes(search.toLowerCase());
     return matchCat && matchSearch;
   });
+
+  const selectService = (svc) => {
+    setOpen(false);
+    setSearch('');
+    navigate(`/customer/services/request/${svc._id}`);
+  };
+
+  const handleKeyDown = (e) => {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % suggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (activeIndex >= 0 && suggestions[activeIndex]) selectService(suggestions[activeIndex]);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
 
   const translateCat = (key) => {
     if (key === 'All') return t('cats.all');
@@ -49,13 +96,50 @@ export default function Services() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2 className="text-xl font-bold text-gray-900">{t('svc.title')}</h2>
-        <input
-          type="text"
-          placeholder={t('svc.searchPlaceholder')}
-          className="input-field max-w-xs"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="relative max-w-xs w-full" ref={searchBoxRef}>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder={t('svc.searchPlaceholder')}
+              className="input-field w-full pr-9"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setOpen(true); setActiveIndex(-1); }}
+              onFocus={() => setOpen(true)}
+              onKeyDown={handleKeyDown}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
+          </div>
+
+          {open && suggestions.length > 0 && (
+            <ul className="absolute z-20 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+              {suggestions.map((svc, idx) => (
+                <li key={svc._id}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); selectService(svc); }}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    className={`w-full flex items-center justify-between gap-3 px-4 py-3 text-left transition-colors ${
+                      activeIndex === idx ? 'bg-brand-50' : 'hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="text-lg shrink-0">{categoryIcons[svc.category] || '🔧'}</span>
+                      <span className="truncate">
+                        <span className="block text-sm font-semibold text-gray-900">{svc.name}</span>
+                        <span className="block text-xs text-gray-500">{translateCat(svc.category)}</span>
+                      </span>
+                    </span>
+                    <span className="text-sm font-bold text-brand-600 shrink-0">₹{svc.basePrice}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">

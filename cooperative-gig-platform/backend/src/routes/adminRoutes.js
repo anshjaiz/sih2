@@ -54,6 +54,20 @@ const {
   getReliabilitySettings,
   updateReliabilitySettings,
 } = require('../controllers/reliability/adminReliabilityController');
+const {
+  listCancellations,
+  getCancellationDetail,
+  getReasons,
+  previewAdminCancellation,
+  cancelBookingForAdmin,
+} = require('../controllers/cancellation/adminCancellationController');
+const {
+  listSuspendedCustomers,
+  listSuspendedWorkers,
+  unsuspendCustomer: unsuspendAdminCustomer,
+  unsuspendWorker: unsuspendAdminWorker,
+  getAuditLogs,
+} = require('../controllers/admin/adminSuspensionController');
 
 // All admin routes protected + admin only
 router.use(protect, authorize('admin'));
@@ -89,12 +103,26 @@ router.post('/reliability/appeals/:id/reject', reviewAppeal);
 router.get('/reliability/settings', getReliabilitySettings);
 router.put('/reliability/settings', updateReliabilitySettings);
 
+// Cancellation oversight
+router.get('/cancellations', listCancellations);
+router.get('/cancellations/reasons', getReasons);
+router.get('/cancellations/:id', getCancellationDetail);
+router.post('/cancellations/:bookingId/preview', previewAdminCancellation);
+router.post('/cancellations/:bookingId', cancelBookingForAdmin);
+
 // Certificates
 router.get('/certificates', getCertificates);
 router.put('/certificates/:id/review', reviewCertificate);
 
 // Customers
 router.get('/customers', getCustomers);
+
+// Suspended accounts (temporary suspensions + admin unsuspend)
+router.get('/suspensions/customers', listSuspendedCustomers);
+router.get('/suspensions/workers', listSuspendedWorkers);
+router.post('/suspensions/customers/:id/unsuspend', unsuspendAdminCustomer);
+router.post('/suspensions/workers/:id/unsuspend', unsuspendAdminWorker);
+router.get('/suspensions/logs', getAuditLogs);
 
 // Bookings
 router.get('/bookings', getAllBookings);

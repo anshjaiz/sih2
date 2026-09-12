@@ -38,6 +38,7 @@ export default function CreateRequest() {
     lng: '78.487',
   });
   const [loading, setLoading] = useState(false);
+  const [cancellationInfo, setCancellationInfo] = useState(null);
 
   useEffect(() => {
     if (!serviceId) return;
@@ -58,6 +59,12 @@ export default function CreateRequest() {
         const res = await api.get('/customers/profile');
         const p = res.data;
         if (p) {
+          setCancellationInfo({
+            outstandingCancellationBalance: p.outstandingCancellationBalance || 0,
+            suspensionStatus: p.suspensionStatus || 'ACTIVE',
+            suspendedUntil: p.suspendedUntil || null,
+            suspensionReason: p.suspensionReason || '',
+          });
           setForm((f) => ({
             ...f,
             address: f.address || p.address || '',
@@ -73,6 +80,10 @@ export default function CreateRequest() {
     loadProfile();
   }, []);
 
+  const isSuspended =
+    cancellationInfo?.suspensionStatus === 'SUSPENDED' &&
+    (!cancellationInfo.suspendedUntil || new Date(cancellationInfo.suspendedUntil).getTime() > Date.now());
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setForm({ ...form, [name]: type === 'checkbox' ? checked : value });
@@ -81,6 +92,10 @@ export default function CreateRequest() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!serviceId) { toast.error(t('create.selectServiceFirst')); return; }
+    if (isSuspended) {
+      toast.error(t('cancel.suspended', 'Your account is temporarily suspended due to repeated cancellations.'));
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
@@ -138,6 +153,38 @@ export default function CreateRequest() {
       {!serviceId && (
         <div className="card mb-6">
           <p className="text-gray-500">{t('create.selectServiceFirst')}</p>
+        </div>
+      )}
+
+      {isSuspended && (
+        <div className="card mb-6 border-red-200 bg-red-50">
+          <h3 className="font-semibold text-red-700">{t('cancel.suspended', 'Your account is temporarily suspended')}</h3>
+          <p className="text-sm text-red-600 mt-1">
+            {cancellationInfo?.suspendedUntil
+              ? t('cancel.suspendedUntil', 'You cannot create new bookings until {{date}}.', {
+                  date: new Date(cancellationInfo.suspendedUntil).toLocaleDateString(),
+                })
+              : t('cancel.suspendedNoDate', 'You cannot create new bookings while suspended.')}
+          </p>
+          {cancellationInfo?.suspensionReason && (
+            <p className="text-xs text-red-500 mt-1">{cancellationInfo.suspensionReason}</p>
+          )}
+          <p className="text-xs text-red-500 mt-2">
+            {t('cancel.suspendedHint', 'Automatic suspension follows repeated eligible cancellations. Contact support if this is a mistake.')}
+          </p>
+        </div>
+      )}
+
+      {!isSuspended && cancellationInfo?.outstandingCancellationBalance > 0 && (
+        <div className="card mb-6 border-amber-200 bg-amber-50">
+          <h3 className="font-semibold text-amber-800">
+            {t('cancel.outstandingBalance', 'Outstanding cancellation balance')}
+          </h3>
+          <p className="text-sm text-amber-700 mt-1">
+            {t('cancel.outstandingMsg', 'You have ₹{{amount}} pending from a cancelled booking. It will be collected with this booking\'s payment.', {
+              amount: cancellationInfo.outstandingCancellationBalance,
+            })}
+          </p>
         </div>
       )}
 
@@ -228,7 +275,7 @@ export default function CreateRequest() {
           </p>
         </div>
 
-        <button type="submit" disabled={loading || !serviceId} className="btn-primary w-full">
+        <button type="submit" disabled={loading || !serviceId || isSuspended} className="btn-primary w-full">
           {loading ? t('create.creating') : t('create.submitRequest')}
         </button>
       </form>

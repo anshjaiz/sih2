@@ -60,7 +60,9 @@ const createPayment = async (paymentData) => {
  * @returns {Object} { payment, order, keyId }
  */
 const createOrder = async ({ booking, customer, worker, method }) => {
-  const amount = booking.priceBreakdown?.total || 0;
+  const serviceAmount = booking.priceBreakdown?.total || 0;
+  const carriedAmount = Math.round((booking.carriedCancellationBalance || 0) * 100) / 100;
+  const amount = serviceAmount + carriedAmount;
   if (!(amount > 0)) {
     const err = new Error('Invalid amount');
     err.userMessage = 'Could not compute a valid payment amount for this booking.';
@@ -83,6 +85,7 @@ const createOrder = async ({ booking, customer, worker, method }) => {
     customer,
     worker,
     amount,
+    carriedCancellationBalance: carriedAmount,
     labourAmount: split.labour,
     materialsAmount: split.materials,
     cooperativeContribution: split.cooperativeContribution,
@@ -238,6 +241,16 @@ const markPaid = async (payment, extra = {}) => {
     paymentStatus: 'PAID',
     payment: payment._id,
   });
+
+  // Settle any carried cancellation balance collected with this payment:
+  // clears the customer's outstanding balance and pays pending worker
+  // compensation now that funds are actually available. Idempotent.
+  if (payment.carriedCancellationBalance > 0 && booking) {
+    const { settleCarriedCancellationBalance } = require('../cancellation/cancellationService');
+    await settleCarriedCancellationBalance({ booking }).catch((e) =>
+      console.error('[payment] cancellation settlement error:', e.message)
+    );
+  }
 
   return payment;
 };

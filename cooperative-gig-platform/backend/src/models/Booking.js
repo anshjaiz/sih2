@@ -6,6 +6,23 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       unique: true,
     },
+    // Outstanding cancellation fee (₹) carried INTO this booking from the
+    // customer's previous cancelled booking. It rides on this booking's
+    // payment and is shown explicitly (never silently rolled into the price).
+    carriedCancellationBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    carriedFromBooking: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Booking',
+      default: null,
+    },
+    collectedCancellationBalance: {
+      type: Boolean,
+      default: false,
+    },
     customer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -238,6 +255,33 @@ const bookingSchema = new mongoose.Schema(
     cancellationReason: {
       type: String,
       default: '',
+    },
+    // Centralized-cancellation outcome fields (set by cancellationService).
+    cancelledAt: Date,
+    cancellationStage: {
+      type: String,
+      enum: ['', 'PRE_ACCEPT', 'POST_ACCEPT', 'JOURNEY', 'ARRIVED', 'WORK_STARTED'],
+      default: '',
+    },
+    cancellationPenalty: {
+      type: Number,
+      default: 0,
+    },
+    cancellationPenaltyEligible: {
+      type: Boolean,
+      default: false,
+    },
+    workerCompensation: {
+      type: Number,
+      default: 0,
+    },
+    cancellationStrikeApplied: {
+      type: Boolean,
+      default: false,
+    },
+    cancellationLedger: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Cancellation',
     },
     payment: {
       type: mongoose.Schema.Types.ObjectId,

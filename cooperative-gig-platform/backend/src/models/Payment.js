@@ -24,6 +24,13 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    // Cancellation balance (₹) carried from a previous cancelled booking and
+    // collected with this payment. Shown explicitly on receipts/invoices.
+    carriedCancellationBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
     // Break down payments for transparency
     labourAmount: {
       type: Number,

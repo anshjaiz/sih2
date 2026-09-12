@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
@@ -10,7 +10,6 @@ export default function WorkerProfile() {
   const [loading, setLoading] = useState(true);
   const [allSkills, setAllSkills] = useState([]);
   const [newSkillId, setNewSkillId] = useState('');
-  const fileInputRef = useRef(null);
   const [form, setForm] = useState({
     bio: '', city: '', area: '', address: '', experienceYears: 0, serviceAreaRadiusKm: 15,
   });
@@ -64,31 +63,6 @@ export default function WorkerProfile() {
       const res = await api.get('/workers/profile');
       setProfile(res.data);
       setNewSkillId('');
-    } catch (err) {
-      toast.error(err.message || t('toast.failed', 'Failed'));
-    }
-  };
-
-  const handleUploadClick = () => {
-    const title = prompt(t('prof.certTitlePrompt', 'Certificate title:'));
-    if (!title) return;
-    fileInputRef.current._title = title;
-    fileInputRef.current.click();
-  };
-
-  const handleCertificateFile = async (e) => {
-    const file = e.target.files && e.target.files[0];
-    const title = fileInputRef.current._title || 'Certificate';
-    e.target.value = '';
-    try {
-      const fd = new FormData();
-      fd.append('title', title);
-      fd.append('issuingAuthority', 'Self-declared');
-      if (file) fd.append('file', file);
-      await api.post('/workers/certificates', fd);
-      toast.success(t('toast.certUploaded', 'Certificate uploaded!'));
-      const res = await api.get('/workers/profile');
-      setProfile(res.data);
     } catch (err) {
       toast.error(err.message || t('toast.failed', 'Failed'));
     }
@@ -247,35 +221,6 @@ export default function WorkerProfile() {
           </div>
         ) : (
           <p className="text-gray-400 text-sm">{t('prof.noSkills', 'No skills added yet')}</p>
-        )}
-      </div>
-
-      {/* Certificates */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">{t('prof.certificates', 'Certificates')}</h3>
-          <div>
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleCertificateFile} />
-            <button onClick={handleUploadClick} className="btn-primary text-sm">+ {t('prof.uploadCertificate', 'Upload Certificate')}</button>
-          </div>
-        </div>
-        {profile?.certificates?.length > 0 ? (
-          <div className="space-y-2">
-            {profile.certificates.map((cert) => (
-              <div key={cert._id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium">{cert.title}</p>
-                  <p className="text-xs text-gray-500">{cert.issuingAuthority}</p>
-                </div>
-                <span className={`badge ${
-                  cert.status === 'APPROVED' ? 'badge-success' :
-                  cert.status === 'REJECTED' ? 'badge-danger' : 'badge-warning'
-                }`}>{cert.status}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-400 text-sm">{t('prof.noCerts', 'No certificates uploaded')}</p>
         )}
       </div>
     </div>

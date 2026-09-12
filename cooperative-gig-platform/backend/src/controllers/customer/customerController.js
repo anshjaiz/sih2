@@ -2,9 +2,14 @@ const Booking = require('../../models/Booking');
 const Service = require('../../models/Service');
 const Worker = require('../../models/WorkerProfile');
 const Customer = require('../../models/CustomerProfile');
+const Cancellation = require('../../models/Cancellation');
 const Payment = require('../../models/Payment');
 const { asyncHandler } = require('../../middleware/errorMiddleware');
 const { haversineDistance } = require('../../utils/geoUtils');
+const {
+  isCustomerSuspended,
+  restoreCustomerIfExpired,
+} = require('../../services/cancellation/cancellationService');
 
 // Customer dashboard data
 const getDashboard = asyncHandler(async (req, res) => {
@@ -90,6 +95,15 @@ const getDashboard = asyncHandler(async (req, res) => {
         totalSpending,
         completedBookings: allJobs.filter((b) => b.status === 'COMPLETED').length,
       },
+      cancellation: {
+        outstandingCancellationBalance: customer?.outstandingCancellationBalance || 0,
+        suspensionStatus: customer?.suspensionStatus || 'ACTIVE',
+        autoSuspended: customer?.autoSuspended || false,
+        suspendedUntil: customer?.suspendedUntil || null,
+        suspensionReason: customer?.suspensionReason || '',
+        meritScore: customer?.meritScore ?? 100,
+        strikesCount: (customer?.cancellationStats?.strikes || []).length,
+      },
       upcomingBooking,
       activeJob,
       previousJobs,
@@ -121,8 +135,46 @@ const getBookings = asyncHandler(async (req, res) => {
 
 // Get customer profile
 const getCustomerProfile = asyncHandler(async (req, res) => {
-  const customer = await Customer.findOne({ user: req.user._id });
-  res.json({ success: true, data: customer });
+  let customer = await Customer.findOne({ user: req.user._id }).lean();
+  if (customer) {
+    customer = await restoreCustomerIfExpired(customer);
+  }
+  res.json({
+    success: true,
+    data: customer,
+    suspension: customer
+      ? {
+          currentlySuspended: isCustomerSuspended(customer),
+          suspendedUntil: customer.suspendedUntil,
+          suspensionReason: customer.suspensionReason,
+        }
+      : null,
+  });
+});
+
+// Cancellation history for the logged-in customer (audit-trail / profile page).
+const getCustomerCancellations = asyncHandler(async (req, res) => {
+  const list = await Cancellation.find({ customer: req.user._id })
+    .populate('booking', 'bookingNumber serviceSnapshot')
+    .sort({ cancelledAt: -1 });
+
+  res.json({
+    success: true,
+    data: list.map((c) => ({
+      id: c._id,
+      bookingNumber: c.bookingNumber,
+      serviceName: c.booking?.serviceSnapshot?.name || c.booking?.serviceSnapshot?.serviceName || '—',
+      cancelledAt: c.cancelledAt,
+      stage: c.stage,
+      penaltyEligible: c.penaltyEligible,
+      customerPenaltyAmount: c.customerPenaltyAmount,
+      customerPenaltySettled: c.customerPenaltySettled,
+      workerCompensationAmount: c.workerCompensationAmount,
+      reasonKey: c.reasonKey,
+      reason: c.reason,
+      cancelledBy: c.cancelledBy,
+    })),
+  });
 });
 
 // Update customer profile
@@ -148,5 +200,6 @@ module.exports = {
   getDashboard,
   getBookings,
   getCustomerProfile,
+  getCustomerCancellations,
   updateCustomerProfile,
 };

@@ -21,6 +21,7 @@ const { ApiError } = require('../../middleware/errorMiddleware');
 const reliabilityConfig = require('../reliability/reliabilityConfig');
 const { deriveLevel } = require('../reliability/reliabilityService');
 const { createNotification } = require('../notification/notificationService');
+const { logAudit, ACTIONS } = require('../audit/auditLogService');
 
 const SUSPENDED_STATUSES = ['TEMPORARILY_SUSPENDED', 'DEACTIVATION_REVIEW'];
 
@@ -119,6 +120,16 @@ const unsuspendWorkerByAdmin = async ({ workerId, reason = '', byUserId = null }
     reason: note,
     admin: byUserId,
     adminNote: reason || '',
+  });
+
+  await logAudit({
+    action: ACTIONS.WORKER_UNSUSPENDED,
+    performedBy: byUserId,
+    targetUser: profile.user,
+    targetRole: 'worker',
+    targetProfile: profile._id,
+    reason: reason || '',
+    metadata: { wasSuspended: true, levelAfter: activeLevel },
   });
 
   await createNotification({

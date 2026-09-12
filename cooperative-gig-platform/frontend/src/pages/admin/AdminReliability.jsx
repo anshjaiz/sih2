@@ -30,6 +30,8 @@ export default function AdminReliability() {
   const [form, setForm] = useState({ points: 0, reason: '', note: '', durationDays: 7, accountStatus: 'TEMPORARILY_SUSPENDED' });
   const [appeals, setAppeals] = useState({ appeals: [], meta: {} });
   const [settings, setSettings] = useState(null);
+  const [cancellations, setCancellations] = useState({ cancellations: [], meta: {} });
+  const [cancelFilter, setCancelFilter] = useState('');
 
   const loadWorkers = useCallback(async (p = page, s = search) => {
     setLoadingList(true);
@@ -69,10 +71,22 @@ export default function AdminReliability() {
     } catch (e) { console.error(e); }
   }, []);
 
+  const loadCancellations = useCallback(async (page = 1, cancelledBy = '') => {
+    try {
+      const params = new URLSearchParams();
+      params.append('page', page);
+      params.append('limit', 20);
+      if (cancelledBy) params.append('cancelledBy', cancelledBy);
+      const res = await api.get(`/admin/cancellations?${params}`);
+      setCancellations(res.data?.data || { cancellations: [], meta: {} });
+    } catch (e) { console.error(e); }
+  }, []);
+
   useEffect(() => {
     if (tab === 'appeals') loadAppeals();
     if (tab === 'settings') loadSettings();
-  }, [tab, loadAppeals, loadSettings]);
+    if (tab === 'cancellations') loadCancellations();
+  }, [tab, loadAppeals, loadSettings, loadCancellations]);
 
   const submitAdjust = async () => {
     if (!form.reason) return toast.error('Reason is required');
@@ -137,6 +151,25 @@ export default function AdminReliability() {
       lateToleranceMinutes: Number(settings.lateToleranceMinutes),
       reminderLeadMinutes: Number(settings.reminderLeadMinutes),
       maxReassignmentAttempts: Number(settings.maxReassignmentAttempts),
+      cancellation: {
+        customerCancelFee: Number(settings.cancellation?.customerCancelFee) || 0,
+        workerCompensation: Number(settings.cancellation?.workerCompensation) || 0,
+        customerStrikeThreshold: Number(settings.cancellation?.customerStrikeThreshold) || 0,
+        workerStrikeThreshold: Number(settings.cancellation?.workerStrikeThreshold) || 0,
+        cancellationWindowDays: Number(settings.cancellation?.cancellationWindowDays) || 0,
+        autoSuspendDurationDays: Number(settings.cancellation?.autoSuspendDurationDays) || 0,
+        suspensionDurations: {
+          first: Number(settings.cancellation?.suspensionDurations?.first) || 7,
+          second: Number(settings.cancellation?.suspensionDurations?.second) || 14,
+          repeated: Number(settings.cancellation?.suspensionDurations?.repeated) || 30,
+        },
+        freeCancelBeforeAccept: !!settings.cancellation?.freeCancelBeforeAccept,
+        customerCancelPoints: Number(settings.cancellation?.customerCancelPoints) || 0,
+        workerCancelAfterAcceptPoints: Number(settings.cancellation?.workerCancelAfterAcceptPoints) || 0,
+        workerCancelAfterJourneyPoints: Number(settings.cancellation?.workerCancelAfterJourneyPoints) || 0,
+        workerCancelAfterArrivalPoints: Number(settings.cancellation?.workerCancelAfterArrivalPoints) || 0,
+        workerCancelAfterWorkStartPoints: Number(settings.cancellation?.workerCancelAfterWorkStartPoints) || 0,
+      },
     };
     try {
       await api.put('/admin/reliability/settings', body);
@@ -149,7 +182,7 @@ export default function AdminReliability() {
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900">Reliability & Merit</h2>
         <div className="flex gap-2">
-          {[['workers', 'Workers'], ['appeals', 'Penalty Appeals'], ['settings', 'Settings']].map(([k, label]) => (
+          {[['workers', 'Workers'], ['appeals', 'Penalty Appeals'], ['cancellations', 'Cancellations'], ['settings', 'Settings']].map(([k, label]) => (
             <button key={k} onClick={() => setTab(k)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium ${tab === k ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {label}
@@ -250,6 +283,68 @@ export default function AdminReliability() {
         </div>
       )}
 
+      {/* ---------------- CANCELLATIONS TAB ---------------- */}
+      {tab === 'cancellations' && (
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            {[['', 'All'], ['customer', 'By customer'], ['worker', 'By worker'], ['admin', 'By admin'], ['system', 'By system']].map(([v, label]) => (
+              <button key={v} onClick={() => { setCancelFilter(v); loadCancellations(1, v); }}
+                className={`px-3 py-1 rounded-full text-xs font-medium ${cancelFilter === v ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {(cancellations.cancellations || []).length === 0 ? (
+            <div className="text-center py-16 text-gray-400">No cancellations found</div>
+          ) : (
+            <div className="card overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 text-left text-gray-500">
+                    <th className="pb-3 font-medium">Booking</th>
+                    <th className="pb-3 font-medium">By</th>
+                    <th className="pb-3 font-medium">Stage</th>
+                    <th className="pb-3 font-medium">Reason</th>
+                    <th className="pb-3 font-medium">Fee</th>
+                    <th className="pb-3 font-medium">Comp.</th>
+                    <th className="pb-3 font-medium">Penalty</th>
+                    <th className="pb-3 font-medium">When</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {(cancellations.cancellations || []).map((c) => (
+                    <tr key={c._id} className="hover:bg-gray-50">
+                      <td className="py-3 font-medium">{c.bookingNumber || c.booking}</td>
+                      <td className="py-3">
+                        <span className="badge badge-gray">{c.cancelledBy}</span>
+                        <p className="text-xs text-gray-500">{c.customer?.name || c.workerUser?.user?.name || ''}</p>
+                      </td>
+                      <td className="py-3 text-gray-600">{c.stage}</td>
+                      <td className="py-3 text-gray-600">{c.reason || c.reasonKey || '—'}</td>
+                      <td className="py-3">{c.customerPenaltyAmount ? `₹${c.customerPenaltyAmount}` : '—'}</td>
+                      <td className="py-3">{c.workerCompensationAmount ? `₹${c.workerCompensationAmount}` : '—'}</td>
+                      <td className="py-3">
+                        <span className={`badge ${c.penaltyEligible ? 'badge-danger' : 'badge-success'}`}>
+                          {c.penaltyEligible ? 'Eligible' : 'Waived'}
+                        </span>
+                      </td>
+                      <td className="py-3 text-gray-500">{new Date(c.cancelledAt || c.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {cancellations.meta?.pages > 1 && (
+                <div className="flex justify-center gap-2 mt-4">
+                  <button onClick={() => loadCancellations(Math.max(1, cancellations.meta.page - 1), cancelFilter)} className="btn-secondary text-sm">← Prev</button>
+                  <span className="text-sm text-gray-500 py-2">{cancellations.meta.page} of {cancellations.meta.pages}</span>
+                  <button onClick={() => loadCancellations(cancellations.meta.page + 1, cancelFilter)} className="btn-secondary text-sm">Next →</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ---------------- SETTINGS TAB ---------------- */}
       {tab === 'settings' && settings && (
         <div className="max-w-2xl card space-y-4">
@@ -295,6 +390,80 @@ export default function AdminReliability() {
                 />
               </div>
             ))}
+          </div>
+          <h3 className="font-semibold pt-4">Cancellation Policy</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              ['customerCancelFee', 'Customer cancel fee (₹)'],
+              ['workerCompensation', 'Worker compensation (₹)'],
+              ['customerStrikeThreshold', 'Customer strike threshold'],
+              ['workerStrikeThreshold', 'Worker strike threshold'],
+              ['cancellationWindowDays', 'Strike window (days)'],
+              ['autoSuspendDurationDays', 'Auto-suspend duration (days, legacy)'],
+              ['suspdFirst', 'Auto-suspend duration — 1st (days)'],
+              ['suspdSecond', 'Auto-suspend duration — 2nd (days)'],
+              ['suspdRepeated', 'Auto-suspend duration — 3rd+ (days)'],
+              ['customerCancelPoints', 'Customer merit decay/eligible cancel'],
+              ['workerCancelAfterAcceptPoints', 'Worker merit — cancel after accept'],
+              ['workerCancelAfterJourneyPoints', 'Worker merit — cancel on the way'],
+              ['workerCancelAfterArrivalPoints', 'Worker merit — cancel at arrival'],
+              ['workerCancelAfterWorkStartPoints', 'Worker merit — cancel at work start'],
+            ].map(([key, label]) => (
+              <div key={key}>
+                <label className="label-text">{label}</label>
+                <input
+                  type="number"
+                  className="input-field"
+                  value={
+                    key === 'suspdFirst'
+                      ? settings.cancellation?.suspensionDurations?.first
+                      : key === 'suspdSecond'
+                      ? settings.cancellation?.suspensionDurations?.second
+                      : key === 'suspdRepeated'
+                      ? settings.cancellation?.suspensionDurations?.repeated
+                      : settings.cancellation?.[key]
+                  }
+                  onChange={(e) => {
+                    if (key.startsWith('suspd')) {
+                      const skey = key === 'suspdFirst' ? 'first' : key === 'suspdSecond' ? 'second' : 'repeated';
+                      setSettings({
+                        ...settings,
+                        cancellation: {
+                          ...(settings.cancellation || {}),
+                          suspensionDurations: {
+                            ...(settings.cancellation?.suspensionDurations || {}),
+                            [skey]: e.target.value,
+                          },
+                        },
+                      });
+                    } else {
+                      setSettings({
+                        ...settings,
+                        cancellation: {
+                          ...(settings.cancellation || {}),
+                          [key]: e.target.value,
+                        },
+                      });
+                    }
+                  }}
+                />
+              </div>
+            ))}
+            <div className="col-span-2 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="freeCancelBeforeAccept"
+                checked={!!settings.cancellation?.freeCancelBeforeAccept}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  cancellation: { ...(settings.cancellation || {}), freeCancelBeforeAccept: e.target.checked },
+                })}
+                className="h-4 w-4 text-brand-600"
+              />
+              <label htmlFor="freeCancelBeforeAccept" className="text-sm text-gray-700">
+                Free cancellation before a worker accepts
+              </label>
+            </div>
           </div>
           <button onClick={saveSettings} className="btn-primary">Save Settings</button>
         </div>

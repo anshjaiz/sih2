@@ -161,6 +161,14 @@ const workerProfileSchema = new mongoose.Schema(
       max: 100,
       min: 0,
     },
+    // Denormalized alias kept in sync with `reliability` for cancellation
+    // outcomes/metrics; never used as the source of truth.
+    meritScore: {
+      type: Number,
+      default: 100,
+      min: 0,
+      max: 100,
+    },
     // Reliability lifecycle status driven by the merit score. This is SEPARATE
     // from administrative suspension (isActive / suspensionUntil) which is
     // handled by complaintService. Low-reliability states here only restrict
@@ -175,6 +183,41 @@ const workerProfileSchema = new mongoose.Schema(
         'DEACTIVATION_REVIEW',
       ],
       default: 'ACTIVE',
+    },
+    // Worker-side cancellation strikes used for automatic merit suspension.
+    autoSuspended: {
+      type: Boolean,
+      default: false,
+    },
+    // Count of AUTOMATIC (repeated-eligible-cancellation) suspensions. Kept
+    // separate from `suspensionCount` (which tracks administrative/complaint
+    // suspensions toward termination) so the two systems never conflict.
+    // Drives escalating durations: 1st = first, 2nd = second, 3rd+ = repeated.
+    autoSuspensionCount: {
+      type: Number,
+      default: 0,
+    },
+    cancellationStats: {
+      strikes: [
+        {
+          at: Date,
+          booking: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Booking',
+          },
+          reason: String,
+          stage: String,
+        },
+      ],
+      eligibleCancellationCount: {
+        type: Number,
+        default: 0,
+      },
+      cancelledCount: {
+        type: Number,
+        default: 0,
+      },
+      lastCancelledAt: Date,
     },
     // Welfare status
     insuranceActive: {

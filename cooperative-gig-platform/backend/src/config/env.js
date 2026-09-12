@@ -13,6 +13,14 @@ module.exports = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientURL: process.env.CLIENT_URL || 'http://localhost:5173',
   osrmBaseUrl: process.env.OSRM_BASE_URL || 'https://router.project-osrm.org',
+  // ── Pre-job navigation window ──────────────────────────────────────
+  // How many minutes before a scheduled job's start time the worker may
+  // begin navigation/travel (navigation_available_time = scheduled start
+  // minus this buffer). Configurable per deployment; defaults to 60 minutes.
+  preJobNavigationBufferMins: (() => {
+    const n = parseFloat(process.env.PRE_JOB_NAVIGATION_BUFFER);
+    return Number.isFinite(n) && n >= 0 ? n : 60;
+  })(),
   // ── Email verification OTPs (Gmail SMTP via Nodemailer) ──────────────
   // Gmail account that sends the OTPs. pass is a Google App Password
   // (https://myaccount.google.com/apppasswords) — 16 chars, no spaces.

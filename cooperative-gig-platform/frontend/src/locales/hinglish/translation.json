@@ -85,6 +85,7 @@
     "demandHeatmap": "Demand Heatmap",
     "aiForecasting": "AI Forecasting",
     "reliability": "Reliability",
+    "suspensions": "Suspensions",
     "workerWelfare": "Worker Welfare",
     "settings": "Settings",
     "logout": "Logout",
@@ -200,6 +201,45 @@
     "emergencyAvailable": "⚡ Emergency service available hai",
     "bookNow": "Abhi Book karein",
     "getDirections": "Direction lein"
+  },
+  "cancel": {
+    "title": "Booking cancel karein",
+    "workerTitle": "Yeh job cancel karein",
+    "workerRef": "Job {{number}} · {{service}}",
+    "reasonLabel": "Aap kyun cancel kar rahe hain?",
+    "selectReason": "Karan chunein",
+    "noFee": "Koi cancellation fee nahi lagegi.",
+    "feeLabel": "Cancellation fee",
+    "feeNextBooking": "Yeh rashi aapki agli booking mein carry hokar uske payment ke saath vasool hogi.",
+    "workerCompensation": "Safar ke liye worker ko ₹{{amount}} compensation milega.",
+    "workerNoPenalty": "Is karan ke liye koi merit deduction nahi hoga.",
+    "workerMeritLabel": "Merit deduction",
+    "threshold": "Baar-baar eligible cancellation se account temporarily suspend ho sakta hai.",
+    "suspended": "Aapka account temporarily suspended hai",
+    "suspendedUntil": "{{date}} tak aap nayi booking nahi bana sakte.",
+    "suspendedNoDate": "Suspension ke dauran aap nayi booking nahi bana sakte.",
+    "suspendedHint": "Baar-baar eligible cancellation ke baad automatic suspension hota hai. Agar yeh galti hai toh support se contact karein.",
+    "outstandingBalance": "Outstanding cancellation balance",
+    "outstandingMsg": "Cancelled booking se aapke paas ₹{{amount}} baaki hai. Yeh is booking ke payment ke saath vasool hogi.",
+    "freeBeforeAccept": "Worker ke request accept karne se pehle koi cancellation fee nahi lagti.",
+    "reasons": {
+      "changed_mind": "Mann badal gaya",
+      "no_longer_need": "Service ki zaroorat nahi",
+      "worker_delayed": "Worker der se aayega",
+      "worker_asked_cancel": "Worker ne cancel karne ko kaha",
+      "emergency": "Emergency",
+      "found_other_solution": "Doosra solution mil gaya",
+      "other": "Anya"
+    },
+    "workerReasons": {
+      "customer_unavailable": "Customer available nahi",
+      "incorrect_address": "Galat pata",
+      "unsafe_situation": "Asurakshit sthiti",
+      "customer_requested_cancellation": "Customer ne cancel karne ko kaha",
+      "transport_problem": "Transport samasya",
+      "emergency": "Emergency",
+      "other": "Anya"
+    }
   },
   "create": {
     "title": "Service Request banayein",
@@ -526,7 +566,8 @@
     "noTeamYet": "Abhi koi team member nahi",
     "pendingApproval": "Approval pending hai",
     "requestCollab": "Collaborator invite karein",
-    "submitting": "Submit ho raha hai..."
+    "submitting": "Submit ho raha hai...",
+    "cancelJob": "Job cancel karein"
   },
   "hist": {
     "title": "Job History",
@@ -980,5 +1021,68 @@
         "q": "Main service kaise book karu?"
       }
     }
+  },
+  "custprof": {
+    "title": "Meri Profile",
+    "subtitle": "Reliability status, suspensions aur cancellation history",
+    "suspendedTitle": "Aapka account temporarily suspended hai",
+    "suspendedUntil": "Aap {{date}} tak nayi booking nahi bana sakte.",
+    "suspendedNoDate": "Suspended rehne ke dauran aap nayi booking nahi bana sakte.",
+    "suspendedAfter": "Aapka suspension khatam hone ke baad aap dobara services book kar sakte ho",
+    "suspendedContact": "Ye suspension baar-baar ke eligible cancellations ki wajah se automatically lagaya gaya tha.",
+    "contactSupport": "Support se contact karo ya dispute karo",
+    "reliabilityTitle": "Reliability score",
+    "cancellationStatus": "Cancellation status",
+    "eligibleCount": "Eligible cancellations:",
+    "meritScore": "Merit score:",
+    "thresholdHint": "Baar-baar eligible cancellations se temporary account suspension hota hai.",
+    "outstandingBalance": "Outstanding balance",
+    "outstandingHint": "Unpaid cancellation fees, aapki agli booking ke saath collect hongi.",
+    "historyTitle": "Cancellation history",
+    "historyEmpty": "Abhi koi cancellation nahi hai.",
+    "hDate": "Date",
+    "hService": "Service",
+    "hStage": "Stage",
+    "hFee": "Fee",
+    "hReason": "Reason",
+    "stage": {
+      "PRE_ACCEPT": "Accept hone se pehle",
+      "POST_ACCEPT": "Accept hone ke baad",
+      "JOURNEY": "Raste mein",
+      "ARRIVED": "Pahunchne par",
+      "WORK_STARTED": "Kaam shuru hone par"
+    },
+    "levelGood": "Good standing",
+    "levelFair": "Fair standing",
+    "levelLow": "Kam reliability",
+    "levelCritical": "Critical"
+  },
+  "admSusp": {
+    "title": "Suspended Accounts",
+    "subtitle": "Repeated eligible cancellations se temporary suspensions aur admin unsuspend",
+    "tab": {
+      "customers": "Customers",
+      "workers": "Workers",
+      "logs": "Audit log"
+    },
+    "filter": {
+      "all": "Sabhi",
+      "suspended": "Abhi suspended",
+      "recent": "Recently suspended",
+      "highCancels": "Zyada cancellation count",
+      "lowScore": "Kam reliability",
+      "auto": "Automatic suspension"
+    },
+    "allActions": "Sabhi actions",
+    "entries": "entries",
+    "records": "records",
+    "searchPlaceholder": "Name / email / phone se dhoondo…",
+    "empty": "Koi record nahi mila",
+    "unsuspend": "Unsuspend",
+    "unsuspendSuccess": "Account unsuspend ho gaya",
+    "unsuspendPromptTitle": "Account unsuspend karo",
+    "unsuspendPromptFor": "Aap unsuspend kar rahe ho:",
+    "unsuspendReasonPlaceholder": "Reason (user ko dikhega)…",
+    "confirmUnsuspend": "Unsuspend confirm karo"
   }
 }

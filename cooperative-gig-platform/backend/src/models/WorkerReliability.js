@@ -39,6 +39,18 @@ const workerReliabilitySchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    cancelledAfterJourneyCount: {
+      type: Number,
+      default: 0,
+    },
+    cancelledAfterArrivalCount: {
+      type: Number,
+      default: 0,
+    },
+    cancelledAfterWorkStartCount: {
+      type: Number,
+      default: 0,
+    },
     collabNoShowCount: {
       type: Number,
       default: 0,

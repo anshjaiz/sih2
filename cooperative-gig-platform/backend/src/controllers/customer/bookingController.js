@@ -38,6 +38,25 @@ const createServiceRequest = asyncHandler(async (req, res) => {
     throw new ApiError('Location is required', 400);
   }
 
+  // ── Cancellation-policy gate ──────────────────────────────────────────
+  // Auto-suspended customers (repeated eligible cancellations) cannot start
+  // new bookings until the suspension window passes. Uses the single shared
+  // enforcement helper so create/confirm/reassign all behave identically.
+  // (Thrown as 429 to preserve the earlier contract of this endpoint.)
+  const { enforceCustomerNotSuspended } = require('../../services/cancellation/cancellationService');
+  let custProfile;
+  try {
+    custProfile = await enforceCustomerNotSuspended(req.user._id);
+  } catch (e) {
+    if (e.code === 'ACCOUNT_SUSPENDED') {
+      throw new ApiError(
+        `Your account is temporarily suspended until ${e.suspendedUntil ? new Date(e.suspendedUntil).toLocaleDateString() : 'an unknown date'} due to repeated eligible cancellations.`,
+        429
+      );
+    }
+    throw e;
+  }
+
   // Compute price. No material estimate at booking time — the customer is not
   // expected to know material costs before the worker visits. Materials are
   // added later only via the worker's + customer-approved material request.
@@ -56,9 +75,18 @@ const createServiceRequest = asyncHandler(async (req, res) => {
   });
 
   // Create booking with REQUESTED status
+  const outstanding = custProfile?.outstandingCancellationBalance || 0;
+  const carriedFrom = await require('../../models/Cancellation')
+    .findOne({ customer: req.user._id, customerPenaltySettled: false, customerPenaltyAmount: { $gt: 0 } })
+    .sort({ createdAt: -1 })
+    .select('booking bookingNumber')
+    .lean();
+
   const booking = await Booking.create({
     customer: req.user._id,
     service: service._id,
+    carriedCancellationBalance: Math.round(outstanding * 100) / 100,
+    carriedFromBooking: carriedFrom?.booking || null,
     serviceSnapshot: {
       name: service.name,
       category: service.category,
@@ -244,82 +272,111 @@ const cancelBooking = asyncHandler(async (req, res) => {
     throw new ApiError('Not authorized', 403);
   }
 
-  if (['COMPLETED', 'CANCELLED', 'DISPUTED'].includes(booking.status)) {
-    throw new ApiError(`Cannot cancel booking in ${booking.status} status`, 400);
-  }
-
-  const workerHadAccepted =
-    booking.acceptedAt &&
-    ['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(booking.status);
-
-  booking.status = 'CANCELLED';
-  booking.cancelledBy = req.user.role === 'admin' ? 'admin' : 'customer';
-  booking.cancellationReason = req.body.reason || 'Cancelled by customer';
-  booking.statusHistory.push({
-    status: 'CANCELLED',
-    updatedAt: new Date(),
-    updatedBy: req.user._id,
-    note: booking.cancellationReason,
+  const { applyCancellation } = require('../../services/cancellation/cancellationService');
+  const result = await applyCancellation({
+    booking,
+    cancelledBy: req.user.role === 'admin' ? 'admin' : 'customer',
+    reasonKey: req.body.reasonKey,
+    reason: req.body.reason,
+    actorId: req.user._id,
+    // Money already paid for this booking is refunded through the payment
+    // service after the central outcome is recorded.
+    refundHandler: async (claimedBooking, outcome) => {
+      if (claimedBooking.payment && ['PAID', 'SUCCESS'].includes(claimedBooking.paymentStatus)) {
+        const { initiateRefund } = require('../../services/payment/paymentService');
+        const refund = await initiateRefund(claimedBooking.payment, {
+          initiatedBy: req.user._id,
+          method: 'MOCK_REFUND',
+          amount: claimedBooking.priceBreakdown?.total || undefined,
+        });
+        await Booking.updateOne(
+          { _id: claimedBooking._id },
+          {
+            $push: {
+              statusHistory: {
+                status: 'CANCELLED',
+                updatedAt: new Date(),
+                updatedBy: req.user._id,
+                note: `Refund initiated (${refund.refundNumber || refund._id})`,
+              },
+            },
+          }
+        );
+        await Notification.create({
+          user: booking.customer,
+          type: 'REFUND_STATUS',
+          title: 'Refund initiated',
+          message: `Your refund of ₹${refund.amount} for ${booking.bookingNumber} is being processed.`,
+          data: { bookingId: booking._id, refundId: refund._id, refundNumber: refund.refundNumber },
+        });
+      }
+    },
   });
-  await booking.save();
 
-  // Reliability: cancelling after a worker accepted unfairly penalises the worker.
-  if (workerHadAccepted && booking.worker) {
-    require('../../services/reliability/reliabilityService')
-      .handleCancelledAfterAccept(booking.worker, booking._id)
-      .catch((e) => console.error('[reliability] cancel penalty error:', e.message));
+  if (result.skipped && result.duplicate) {
+    return res.status(200).json({
+      success: true,
+      message: 'Booking was already cancelled',
+      data: { booking: result.booking, cancellation: result.cancellation },
+    });
   }
 
-  if (booking.worker && workerHadAccepted) {
-    const workerUser = await Worker.findById(booking.worker).select('user');
-    if (workerUser) {
-      await Notification.create({
-        user: workerUser.user,
-        type: 'BOOKING_CREATED',
-        title: 'Booking cancelled by customer',
-        message: `The customer cancelled ${booking.bookingNumber} after you accepted it.`,
-        data: { bookingId: booking._id, bookingNumber: booking.bookingNumber },
-      });
-    }
+  res.json({
+    success: true,
+    message: 'Booking cancelled',
+    data: { booking: result.booking, cancellation: result.cancellation, outcome: result.outcome },
+  });
+});
+
+// Preview what a cancellation would mean WITHOUT applying it. Lets the UI
+// show the fee / compensation / strike before the customer commits.
+const previewCancellation = asyncHandler(async (req, res) => {
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) throw new ApiError('Booking not found', 404);
+
+  const isOwner = booking.customer.toString() === req.user._id.toString();
+  if (!isOwner && req.user.role !== 'admin') {
+    throw new ApiError('Not authorized', 403);
   }
 
-  // Refund any money already paid for this booking. The gateway refund is
-  // simulated in TEST mode (Razorpay refund attempted when test keys exist)
-  // and any held/released worker earning is reversed in the wallet ledger.
-  if (booking.payment && ['PAID', 'SUCCESS'].includes(booking.paymentStatus)) {
-    const { initiateRefund } = require('../../services/payment/paymentService');
-    try {
-      const refund = await initiateRefund(booking.payment, {
-        initiatedBy: req.user._id,
-        method: 'MOCK_REFUND',
-        amount: booking.priceBreakdown?.total || undefined,
-      });
-      booking.statusHistory.push({
-        status: 'CANCELLED',
-        updatedAt: new Date(),
-        updatedBy: req.user._id,
-        note: `Refund initiated (${refund.refundNumber || refund._id})`,
-      });
-      await booking.save();
-      await Notification.create({
-        user: booking.customer,
-        type: 'REFUND_STATUS',
-        title: 'Refund initiated',
-        message: `Your refund of ₹${refund.amount} for ${booking.bookingNumber} is being processed.`,
-        data: { bookingId: booking._id, refundId: refund._id, refundNumber: refund.refundNumber },
-      });
-    } catch (e) {
-      console.error('[refund] cancellation refund error:', e.message);
-    }
-  }
+  const { calculateCancellationOutcome } = require('../../services/cancellation/cancellationService');
+  const outcome = await calculateCancellationOutcome(
+    booking,
+    req.user.role === 'admin' ? 'admin' : 'customer',
+    req.body.reasonKey || req.query.reasonKey || ''
+  );
+  const settings = await require('../../services/reliability/reliabilityConfig').getSettings();
 
-  res.json({ success: true, message: 'Booking cancelled', data: booking });
+  res.json({
+    success: true,
+    data: {
+      outcome,
+      currentStatus: booking.status,
+      outstandingAfterPreview: outcome.customerPenaltyAmount,
+      compensationToWorker: outcome.workerCompensationAmount,
+      config: {
+        customerCancelFee: settings.cancellation.customerCancelFee,
+        workerCompensation: settings.cancellation.workerCompensation,
+        freeCancelBeforeAccept: settings.cancellation.freeCancelBeforeAccept,
+      },
+    },
+  });
 });
 
 // Request a replacement worker after a no-show / worker failure
 const requestReassignment = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id);
   if (!booking) throw new ApiError('Booking not found', 404);
+
+  // Suspended customers cannot use restricted account actions (reassignment
+  // re-enters the job market on their behalf).
+  const { enforceCustomerNotSuspended } = require('../../services/cancellation/cancellationService');
+  await enforceCustomerNotSuspended(req.user._id).catch((e) => {
+    if (e.code === 'ACCOUNT_SUSPENDED') {
+      throw new ApiError(`Your account is temporarily suspended. ${e.message}`, 429);
+    }
+    throw e;
+  });
 
   const isOwner = booking.customer.toString() === req.user._id.toString();
   if (!isOwner && req.user.role !== 'admin') {
@@ -351,5 +408,6 @@ module.exports = {
   createServiceRequest,
   getBookingById,
   cancelBooking,
+  previewCancellation,
   requestReassignment,
 };

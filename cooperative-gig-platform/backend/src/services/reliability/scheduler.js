@@ -37,6 +37,7 @@ const {
 } = require('./reliabilityService');
 const { createNotification, notifyUsers } = require('../notification/notificationService');
 const { sweepExpiredSuspensions } = require('../worker/workerSuspensionService');
+const { sweepExpiredCustomerSuspensions } = require('../cancellation/cancellationService');
 const { rematchAllOpenBookings } = require('../matching/matchingService');
 
 let intervalHandle = null;
@@ -401,6 +402,14 @@ const handleExpiredSuspensions = async () => {
 };
 
 /**
+ * Lift auto-suspensions for customers whose suspension window has passed
+ * (repeated eligible cancellations) so they can book again.
+ */
+const handleExpiredCustomerSuspensions = async () => {
+  return await sweepExpiredCustomerSuspensions();
+};
+
+/**
  * Re-run smart matching for every open MATCHING booking so candidate lists
  * stay fresh as eligibility data changes (new worker verified, skill
  * verified/backfilled, worker moved, etc.). Without this pass a booking
@@ -437,7 +446,7 @@ const runSchedulerOnce = async () => {
   try {
     const settings = await getSettings();
     const now = new Date();
-    const [expired, noShows, retries, reminders, collabNoShows, suspensions, rematch] =
+    const [expired, noShows, retries, reminders, collabNoShows, suspensions, customerSuspensions, rematch] =
       await Promise.all([
         handleExpiredJobs(settings, now),
         handleNoShows(settings, now),
@@ -445,6 +454,7 @@ const runSchedulerOnce = async () => {
         handleReminders(settings, now),
         handleCollaboratorNoShows(settings, now),
         handleExpiredSuspensions(),
+        handleExpiredCustomerSuspensions(),
         handleRematchOpenBookings(now),
       ]);
     return {
@@ -455,6 +465,7 @@ const runSchedulerOnce = async () => {
       reminders,
       collabNoShows,
       suspensions,
+      customerSuspensions,
       rematch,
     };
   } finally {

@@ -16,7 +16,56 @@ const {
   isWorkerTakeableForJobs,
 } = require('../../services/reliability/reliabilityService');
 const { getSettings } = require('../../services/reliability/reliabilityConfig');
-const { resolveScheduleTimes } = require('../../utils/scheduleUtils');
+const { resolveScheduleTimes, getNavigationTimes, formatTimeLabel } = require('../../utils/scheduleUtils');
+const env = require('../../config/env');
+
+// Time-based gating for navigation and job start, always evaluated on SERVER
+// time (never the device clock). A booking with no derivable schedule (e.g.
+// legacy job without a time slot) keeps both unlocked so existing flows are
+// never broken for un-schedulable jobs.
+const getJobWindowPolicy = (booking) => {
+  const { scheduledStartTime, navigationAvailableTime } = getNavigationTimes(
+    booking,
+    env.preJobNavigationBufferMins
+  );
+  const now = new Date();
+  if (!scheduledStartTime) {
+    return {
+      now,
+      scheduledStartTime: null,
+      navigationAvailableTime: null,
+      navigationAllowed: true,
+      startAllowed: true,
+    };
+  }
+  return {
+    now,
+    scheduledStartTime,
+    navigationAvailableTime,
+    navigationAllowed: now >= navigationAvailableTime,
+    startAllowed: now >= scheduledStartTime,
+  };
+};
+
+const enforceNavigationAllowed = (booking) => {
+  const p = getJobWindowPolicy(booking);
+  if (!p.navigationAllowed) {
+    throw new ApiError(
+      `Navigation is available from ${formatTimeLabel(p.navigationAvailableTime)}.`,
+      400
+    );
+  }
+};
+
+const enforceScheduledStart = (booking) => {
+  const p = getJobWindowPolicy(booking);
+  if (!p.startAllowed) {
+    throw new ApiError(
+      `You can start this job only after ${formatTimeLabel(p.scheduledStartTime)}.`,
+      400
+    );
+  }
+};
 
 // Helper to get worker profile for current user
 const getWorkerId = async (userId) => {
@@ -283,7 +332,23 @@ const getActiveJobs = asyncHandler(async (req, res) => {
     return !scheduledEndTime || scheduledEndTime.getTime() >= nowMs;
   });
 
-  res.json({ success: true, data: activeReady });
+  // Expose the effective schedule + navigation windows (server-derived) so the
+  // UI can gate the Navigate / Start buttons from server-authoritative data,
+  // including after refresh, app restart or re-login.
+  const active = activeReady.map((b) => {
+    const { scheduledStartTime, scheduledEndTime } = resolveScheduleTimes(b);
+    const { navigationAvailableTime } = getNavigationTimes(b, env.preJobNavigationBufferMins);
+    const obj = b.toObject();
+    obj.effectiveScheduledStartTime = scheduledStartTime ? scheduledStartTime.toISOString() : null;
+    obj.effectiveScheduledEndTime = scheduledEndTime ? scheduledEndTime.toISOString() : null;
+    obj.effectiveNavigationAvailableTime = navigationAvailableTime
+      ? navigationAvailableTime.toISOString()
+      : null;
+    obj.navigationBufferMinutes = env.preJobNavigationBufferMins;
+    return obj;
+  });
+
+  res.json({ success: true, data: active });
 });
 
 // Start job
@@ -299,6 +364,9 @@ const startJob = asyncHandler(async (req, res) => {
   if (booking.status !== 'ACCEPTED' && booking.status !== 'ON_THE_WAY' && booking.status !== 'WORKER_ARRIVED') {
     throw new ApiError(`Cannot start job in ${booking.status} status`, 400);
   }
+
+  // Scheduled jobs can only be started once the scheduled start time arrives.
+  enforceScheduledStart(booking);
 
   // Explicit check-in: only the Start button (not app open) records arrival.
   await recordCheckIn(booking, worker, {
@@ -582,6 +650,15 @@ const updateJobStatus = asyncHandler(async (req, res) => {
     throw new ApiError(`Cannot transition from ${booking.status} to ${status}`, 400);
   }
 
+  // Navigation/travel and starting work are each gated on the scheduled times
+  // (server time), with their own windows.
+  if (status === 'ON_THE_WAY') {
+    enforceNavigationAllowed(booking);
+  }
+  if (status === 'STARTED') {
+    enforceScheduledStart(booking);
+  }
+
   // Arrival / work started = explicit check-in.
   if (['WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(status)) {
     await recordCheckIn(booking, worker);
@@ -599,6 +676,81 @@ const updateJobStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, message: `Status updated to ${status}`, data: booking });
 });
 
+// Worker cancels a job they had accepted (or are already travelling to / on).
+// Note: this is distinct from `rejectJob`, which only ever fires BEFORE
+// acceptance. All cancellation policy lives in cancellationService.
+const cancelJob = asyncHandler(async (req, res) => {
+  const worker = await Worker.findOne({ user: req.user._id });
+  if (!worker) throw new ApiError('Worker profile not found', 404);
+
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) throw new ApiError('Booking not found', 404);
+  if (!booking.worker || booking.worker.toString() !== worker._id.toString()) {
+    throw new ApiError('Not your job', 403);
+  }
+
+  const { applyCancellation } = require('../../services/cancellation/cancellationService');
+  const result = await applyCancellation({
+    booking,
+    cancelledBy: 'worker',
+    reasonKey: req.body.reasonKey,
+    reason: req.body.reason,
+    actorId: req.user._id,
+  });
+
+  if (result.skipped && result.duplicate) {
+    return res.status(200).json({
+      success: true,
+      message: 'Job was already cancelled',
+      data: { booking: result.booking, cancellation: result.cancellation },
+    });
+  }
+
+  const io = getIO();
+  if (io) {
+    io.to(`customer_${booking.customer}`).emit('booking_update', {
+      bookingId: booking._id,
+      status: 'CANCELLED',
+      cancelledBy: 'worker',
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Job cancelled',
+    data: { booking: result.booking, cancellation: result.cancellation, outcome: result.outcome },
+  });
+});
+
+// Preview the merit/financial impact of a worker cancellation before applying.
+const previewJobCancel = asyncHandler(async (req, res) => {
+  const worker = await Worker.findOne({ user: req.user._id });
+  if (!worker) throw new ApiError('Worker profile not found', 404);
+
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) throw new ApiError('Booking not found', 404);
+  if (!booking.worker || booking.worker.toString() !== worker._id.toString()) {
+    throw new ApiError('Not your job', 403);
+  }
+
+  const { calculateCancellationOutcome } = require('../../services/cancellation/cancellationService');
+  const outcome = await calculateCancellationOutcome(
+    booking,
+    'worker',
+    req.body.reasonKey || req.query.reasonKey || ''
+  );
+
+  res.json({
+    success: true,
+    data: {
+      outcome,
+      currentStatus: booking.status,
+      meritDelta: outcome.workerMeritPoints,
+      compensation: outcome.workerCompensationAmount,
+    },
+  });
+});
+
 module.exports = {
   getWorkerDashboard,
   getJobRequests,
@@ -614,5 +766,7 @@ module.exports = {
   getEarnings,
   getWorkerReviews,
   updateJobStatus,
+  cancelJob,
+  previewJobCancel,
   getWorkerId,
 };

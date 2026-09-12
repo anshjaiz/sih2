@@ -25,6 +25,8 @@ const {
   updateJobStatus,
   confirmCompletion,
   getJobHistory,
+  cancelJob,
+  previewJobCancel,
 } = require('../controllers/worker/workerJobsController');
 const {
   getMyReliability,
@@ -93,6 +95,8 @@ router.post('/jobs/:id/start', protect, startJob);
 router.post('/jobs/:id/arrive', protect, arriveBooking);
 router.post('/jobs/:id/complete', protect, upload.array('afterImages', 5), completeJob);
 router.post('/jobs/:id/status', protect, updateJobStatus);
+router.put('/jobs/:id/cancel', protect, cancelJob);
+router.post('/jobs/:id/cancel-preview', protect, previewJobCancel);
 router.post('/jobs/:id/confirm', protect, confirmCompletion);
 router.post('/jobs/:id/material-request', protect, submitMaterialRequest);
 

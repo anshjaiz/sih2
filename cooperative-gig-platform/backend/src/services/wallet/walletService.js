@@ -103,6 +103,42 @@ const creditJobEarning = async ({ bookingId, paymentId, workerId, amount }) => {
   return { created: true, transaction: txn, earning };
 };
 
+// ── Cancellation compensation credit (funded by a collected cancel fee) ─
+// IDEMPOTENT by `reference`: re-running with the same reference returns the
+// existing txn instead of double-crediting the worker.
+const creditCompensation = async ({ workerId, amount, bookingId, reference }) => {
+  const credit = round2(amount);
+  if (credit <= 0) return { created: false, credit: 0 };
+
+  const existing = await WalletTransaction.findOne({
+    worker: workerId,
+    type: 'ADJUSTMENT',
+    reference,
+  });
+  if (existing) return { created: false, transaction: existing, credit };
+
+  const txn = await WalletTransaction.create({
+    worker: workerId,
+    booking: bookingId,
+    type: 'ADJUSTMENT',
+    amount: credit,
+    status: 'COMPLETED',
+    description: 'Compensation for travel after a cancelled booking',
+    reference,
+  }).catch((err) => {
+    if (err && err.code === 11000) return null;
+    throw err;
+  });
+  if (!txn) return { created: false, credit };
+
+  await getOrCreateWallet(workerId);
+  await WorkerWallet.updateOne(
+    { worker: workerId },
+    { $inc: { availableBalance: credit, totalEarned: credit } }
+  );
+  return { created: true, transaction: txn, credit };
+};
+
 // ── Earning release (customer confirms completion) ---------------------
 // IDEMPOTENT: a PENDING txn proceeds to COMPLETED exactly once.
 const releaseEarning = async ({ bookingId, workerId }) => {
@@ -285,6 +321,7 @@ module.exports = {
   round2,
   getOrCreateWallet,
   creditJobEarning,
+  creditCompensation,
   releaseEarning,
   reverseEarning,
   requestWithdrawal,

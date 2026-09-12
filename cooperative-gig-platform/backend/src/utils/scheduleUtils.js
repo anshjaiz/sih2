@@ -20,6 +20,17 @@ const toDate = (value) => {
   return isNaN(d.getTime()) ? null : d;
 };
 
+// "9:00 AM"-style label used in worker-facing error messages and UI hints.
+const formatTimeLabel = (date) => {
+  const d = toDate(date);
+  if (!d) return '';
+  let h = d.getHours();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m} ${ampm}`;
+};
+
 /**
  * @param {Date|string} requestedDate
  * @param {String} timeSlot
@@ -80,4 +91,25 @@ const resolveScheduleTimes = (booking) => {
   };
 };
 
-module.exports = { deriveScheduleWindow, resolveScheduleTimes, SLOT_RANGES };
+/**
+ * Effective pre-job navigation window for a booking.
+ * navigationAvailableTime = scheduledStartTime - bufferMinutes.
+ * Returns null fields when no schedule can be derived (e.g. emergency or
+ * legacy booking with no time slot) — callers treat null as "never blocked".
+ *
+ * @param {Object} booking
+ * @param {Number} bufferMinutes navigation buffer in minutes (default 60)
+ */
+const getNavigationTimes = (booking, bufferMinutes = 60) => {
+  const { scheduledStartTime } = resolveScheduleTimes(booking);
+  if (!scheduledStartTime) {
+    return { scheduledStartTime: null, navigationAvailableTime: null };
+  }
+  const mins = Number.isFinite(bufferMinutes) && bufferMinutes >= 0 ? bufferMinutes : 60;
+  return {
+    scheduledStartTime,
+    navigationAvailableTime: new Date(scheduledStartTime.getTime() - mins * 60000),
+  };
+};
+
+module.exports = { deriveScheduleWindow, resolveScheduleTimes, getNavigationTimes, formatTimeLabel, SLOT_RANGES };

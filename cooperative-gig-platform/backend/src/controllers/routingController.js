@@ -20,7 +20,7 @@
 const Booking = require('../models/Booking');
 const Worker = require('../models/WorkerProfile');
 const { asyncHandler, ApiError } = require('../middleware/errorMiddleware');
-const { resolveScheduleTimes } = require('../utils/scheduleUtils');
+const { resolveScheduleTimes, getNavigationTimes, formatTimeLabel } = require('../utils/scheduleUtils');
 const env = require('../config/env');
 
 const NAVIGABLE_STATUSES = ['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'];
@@ -108,6 +108,16 @@ const getRoute = asyncHandler(async (req, res) => {
     const now = new Date();
     if (!booking.workerCheckInAt && scheduledEndTime && scheduledEndTime.getTime() < now.getTime()) {
       throw new ApiError('This job has expired and is no longer active', 400);
+    }
+
+    // Pre-job navigation window: routing/travel requests are only served once
+    // the navigation window opens (scheduled start minus the configured buffer).
+    const { navigationAvailableTime } = getNavigationTimes(booking, env.preJobNavigationBufferMins);
+    if (navigationAvailableTime && now < navigationAvailableTime) {
+      throw new ApiError(
+        `Navigation is available from ${formatTimeLabel(navigationAvailableTime)}.`,
+        400
+      );
     }
 
     const coords = booking.location && Array.isArray(booking.location.coordinates)

@@ -25,6 +25,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       { to: '/customer/bookings', icon: HiOutlineClipboardList, label: t('nav.myBookings') },
       { to: '/customer/payments', icon: HiOutlineCurrencyRupee, label: t('nav.payments') },
       { to: '/customer/complaints', icon: HiOutlineExclamationTriangle, label: t('nav.myComplaints') },
+      { to: '/customer/profile', icon: HiOutlineUser, label: t('nav.myProfile') },
     ],
     worker: [
       { to: '/worker', icon: HiOutlineHome, label: t('nav.dashboard'), end: true },
@@ -47,6 +48,7 @@ export default function Sidebar({ role, collapsed, setCollapsed }) {
       { to: '/admin/demand', icon: HiOutlineMap, label: t('nav.demandHeatmap') },
       { to: '/admin/forecast', icon: HiOutlineFire, label: t('nav.aiForecasting') },
       { to: '/admin/reliability', icon: HiOutlineShieldCheck, label: t('nav.reliability') },
+      { to: '/admin/suspensions', icon: HiOutlineFire, label: t('nav.suspensions') },
       { to: '/admin/welfare', icon: HiOutlineHeart, label: t('nav.workerWelfare') },
       { to: '/admin/settings', icon: HiOutlineCog, label: t('nav.settings') },
     ],

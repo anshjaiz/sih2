@@ -85,6 +85,7 @@
     "demandHeatmap": "Demand Heatmap",
     "aiForecasting": "AI Forecasting",
     "reliability": "Reliability",
+    "suspensions": "Suspensions",
     "workerWelfare": "Worker Welfare",
     "settings": "Settings",
     "logout": "Logout",
@@ -200,6 +201,45 @@
     "emergencyAvailable": "⚡ Emergency service available",
     "bookNow": "Book Now",
     "getDirections": "Get Directions"
+  },
+  "cancel": {
+    "title": "Cancel booking",
+    "workerTitle": "Cancel this job",
+    "workerRef": "Job {{number}} · {{service}}",
+    "reasonLabel": "Why are you cancelling?",
+    "selectReason": "Select a reason",
+    "noFee": "No cancellation fee will be charged.",
+    "feeLabel": "Cancellation fee",
+    "feeNextBooking": "This amount is carried to your next booking and collected with its payment.",
+    "workerCompensation": "The worker will be compensated ₹{{amount}} for travel.",
+    "workerNoPenalty": "No merit deduction applies for this reason.",
+    "workerMeritLabel": "Merit deduction",
+    "threshold": "Repeated eligible cancellations can lead to a temporary account suspension.",
+    "suspended": "Your account is temporarily suspended",
+    "suspendedUntil": "You cannot create new bookings until {{date}}.",
+    "suspendedNoDate": "You cannot create new bookings while suspended.",
+    "suspendedHint": "Automatic suspension follows repeated eligible cancellations. Contact support if this is a mistake.",
+    "outstandingBalance": "Outstanding cancellation balance",
+    "outstandingMsg": "You have ₹{{amount}} pending from a cancelled booking. It will be collected with this booking's payment.",
+    "freeBeforeAccept": "No cancellation fee applies before a worker accepts your request.",
+    "reasons": {
+      "changed_mind": "Changed my mind",
+      "no_longer_need": "No longer need service",
+      "worker_delayed": "Worker is delayed",
+      "worker_asked_cancel": "Worker asked me to cancel",
+      "emergency": "Emergency",
+      "found_other_solution": "Found another solution",
+      "other": "Other"
+    },
+    "workerReasons": {
+      "customer_unavailable": "Customer unavailable",
+      "incorrect_address": "Incorrect address",
+      "unsafe_situation": "Unsafe situation",
+      "customer_requested_cancellation": "Customer requested cancellation",
+      "transport_problem": "Transport problem",
+      "emergency": "Emergency",
+      "other": "Other"
+    }
   },
   "create": {
     "title": "Create Service Request",
@@ -499,7 +539,7 @@
     "noActiveJobs": "No active jobs right now",
     "onMyWay": "On My Way",
     "arrived": "I've Arrived",
-    "startWork": "Start Work",
+    "startWork": "Start Job",
     "inProgress": "In Progress",
     "completeJob": "Complete Job",
     "markComplete": "Mark as Completed",
@@ -526,7 +566,13 @@
     "noTeamYet": "No team members yet",
     "pendingApproval": "Pending approval",
     "requestCollab": "Invite Collaborator",
-    "submitting": "Submitting..."
+    "submitting": "Submitting...",
+    "scheduledFor": "Scheduled for {{time}}",
+    "navigateToCustomer": "Navigate to Customer",
+    "availableBeforeJob": "Available {{duration}} before the job",
+    "jobStartsAt": "Job starts at {{time}}",
+    "startAvailableAt": "Available at {{time}}",
+    "cancelJob": "Cancel job"
   },
   "hist": {
     "title": "Job History",
@@ -583,7 +629,6 @@
     "rating": "Rating",
     "completedJobs": "Jobs Completed",
     "memberSince": "Member since",
-    "certTitlePrompt": "Certificate title:",
     "statusLabel": "Status:",
     "completenessMsg": "Profile completeness affects your matching score",
     "reliabilityScore": "Reliability Score",
@@ -609,10 +654,7 @@
     "add": "Add",
     "years": "years",
     "verified": "✓ Verified",
-    "pendingApproval": "⏳ Pending approval",
-    "certificates": "Certificates",
-    "uploadCertificate": "Upload Certificate",
-    "noCerts": "No certificates uploaded"
+    "pendingApproval": "⏳ Pending approval"
   },
   "collab": {
     "title": "Collaborations",
@@ -810,7 +852,6 @@
     "profileUpdated": "Profile updated!",
     "selectSkillFirst": "Select a skill first",
     "skillAdded": "Skill added. It will match jobs only after admin verification.",
-    "certUploaded": "Certificate uploaded!",
     "statusUpdated": "Status updated"
   },
   "loc": {
@@ -980,5 +1021,68 @@
         "q": "How do I book a service?"
       }
     }
+  },
+  "custprof": {
+    "title": "My Profile",
+    "subtitle": "Reliability status, suspensions and cancellation history",
+    "suspendedTitle": "Your account is temporarily suspended",
+    "suspendedUntil": "You cannot create new bookings until {{date}}.",
+    "suspendedNoDate": "You cannot create new bookings while suspended.",
+    "suspendedAfter": "You can book services again after your suspension ends on",
+    "suspendedContact": "This suspension was applied automatically for repeated eligible cancellations.",
+    "contactSupport": "Contact support or dispute this",
+    "reliabilityTitle": "Reliability score",
+    "cancellationStatus": "Cancellation status",
+    "eligibleCount": "Eligible cancellations:",
+    "meritScore": "Merit score:",
+    "thresholdHint": "Repeated eligible cancellations lead to a temporary account suspension.",
+    "outstandingBalance": "Outstanding balance",
+    "outstandingHint": "Unpaid cancellation fees, collected with your next booking.",
+    "historyTitle": "Cancellation history",
+    "historyEmpty": "No cancellations yet.",
+    "hDate": "Date",
+    "hService": "Service",
+    "hStage": "Stage",
+    "hFee": "Fee",
+    "hReason": "Reason",
+    "stage": {
+      "PRE_ACCEPT": "Before acceptance",
+      "POST_ACCEPT": "After acceptance",
+      "JOURNEY": "On the way",
+      "ARRIVED": "At arrival",
+      "WORK_STARTED": "At work start"
+    },
+    "levelGood": "Good standing",
+    "levelFair": "Fair standing",
+    "levelLow": "Low reliability",
+    "levelCritical": "Critical"
+  },
+  "admSusp": {
+    "title": "Suspended Accounts",
+    "subtitle": "Temporary suspensions from repeated eligible cancellations and admin unsuspend",
+    "tab": {
+      "customers": "Customers",
+      "workers": "Workers",
+      "logs": "Audit log"
+    },
+    "filter": {
+      "all": "All",
+      "suspended": "Currently suspended",
+      "recent": "Recently suspended",
+      "highCancels": "High cancellation count",
+      "lowScore": "Low reliability",
+      "auto": "Automatic suspension"
+    },
+    "allActions": "All actions",
+    "entries": "entries",
+    "records": "records",
+    "searchPlaceholder": "Search by name / email / phone…",
+    "empty": "No records found",
+    "unsuspend": "Unsuspend",
+    "unsuspendSuccess": "Account unsuspended",
+    "unsuspendPromptTitle": "Unsuspend account",
+    "unsuspendPromptFor": "You are unsuspending:",
+    "unsuspendReasonPlaceholder": "Reason (shown to the user)…",
+    "confirmUnsuspend": "Confirm unsuspend"
   }
 }

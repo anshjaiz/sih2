@@ -54,6 +54,74 @@ const customerProfileSchema = new mongoose.Schema(
       type: [String],
       default: ['English', 'Hindi'],
     },
+    // ── Reliability / cancellation system ──────────────────────────────
+    // Customer-side merit — decays on eligible cancellations. Mirrors the
+    // worker reliability score so cancellation outcomes are comparable.
+    meritScore: {
+      type: Number,
+      default: 100,
+      min: 0,
+      max: 100,
+    },
+    reliabilityScore: {
+      type: Number,
+      default: 100,
+      min: 0,
+      max: 100,
+    },
+    // Unpaid cancellation fees owed by this customer. Shown transparently on
+    // the next booking and collected with its payment. Never silently added.
+    outstandingCancellationBalance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    // Auto-suspension from repeated eligible cancellations (configurable
+    // threshold within a window). Separate from admin suspension.
+    suspensionStatus: {
+      type: String,
+      enum: ['ACTIVE', 'SUSPENDED'],
+      default: 'ACTIVE',
+    },
+    suspendedAt: Date,
+    suspendedUntil: Date,
+    suspensionReason: {
+      type: String,
+      default: '',
+    },
+    autoSuspended: {
+      type: Boolean,
+      default: false,
+    },
+    // Number of automatic (repeated-cancellation) suspensions received.
+    // Drives escalating durations: 1st = first, 2nd = second, 3rd+ = repeated.
+    suspensionCount: {
+      type: Number,
+      default: 0,
+    },
+    cancellationStats: {
+      strikes: [
+        {
+          at: Date,
+          booking: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Booking',
+          },
+          reason: String,
+          stage: String,
+        },
+      ],
+      eligibleCancellationCount: {
+        type: Number,
+        default: 0,
+      },
+      cancelledCount: {
+        type: Number,
+        default: 0,
+      },
+      lastCancelledAt: Date,
+      lastSettledAt: Date,
+    },
   },
   {
     timestamps: true,

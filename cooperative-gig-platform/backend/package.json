@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "seed": "node src/utils/seedDatabase.js"
+    "seed": "node src/utils/seedDatabase.js",
+    "reset-users": "node src/utils/resetUsers.js"
   },
   "keywords": [
     "gig",

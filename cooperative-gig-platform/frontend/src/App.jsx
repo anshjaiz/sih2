@@ -19,6 +19,7 @@ import CreateRequest from './pages/customer/CreateRequest';
 import MyBookings from './pages/customer/MyBookings';
 import BookingDetails from './pages/customer/BookingDetails';
 import MyComplaints from './pages/customer/MyComplaints';
+import Profile from './pages/customer/Profile';
 import PaymentHistory from './pages/customer/PaymentHistory';
 
 // Worker pages
@@ -44,6 +45,7 @@ import AdminWelfare from './pages/admin/AdminWelfare';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminReliability from './pages/admin/AdminReliability';
 import AdminPayments from './pages/admin/AdminPayments';
+import AdminSuspensions from './pages/admin/AdminSuspensions';
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, loading } = useAuth();
@@ -101,6 +103,7 @@ export default function App() {
             <Route path="bookings/:id" element={<BookingDetails />} />
             <Route path="payments" element={<PaymentHistory />} />
             <Route path="complaints" element={<MyComplaints />} />
+            <Route path="profile" element={<Profile />} />
           </Route>
 
           {/* Worker routes */}
@@ -127,6 +130,7 @@ export default function App() {
             <Route path="forecast" element={<AdminForecast />} />
             <Route path="welfare" element={<AdminWelfare />} />
             <Route path="reliability" element={<AdminReliability />} />
+            <Route path="suspensions" element={<AdminSuspensions />} />
             <Route path="payments" element={<AdminPayments />} />
             <Route path="settings" element={<AdminSettings />} />
           </Route>

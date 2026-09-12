@@ -38,6 +38,28 @@ const ENV_DEFAULTS = {
   reminderLeadMinutes: 60,
   maxReassignmentAttempts: 2,
   schedulerIntervalSeconds: 60,
+  cancellation: {
+    customerCancelFee: 75,
+    workerCompensation: 50,
+    customerStrikeThreshold: 3,
+    workerStrikeThreshold: 3,
+    cancellationWindowDays: 30,
+    // Escalating automatic-suspension durations (days) by occurrence:
+    // 1st = first, 2nd = second, 3rd or later = repeated.
+    suspensionDurations: {
+      first: 7,
+      second: 14,
+      repeated: 30,
+    },
+    // Backward-compatible flat fallback when suspensionDurations are unset.
+    autoSuspendDurationDays: 7,
+    freeCancelBeforeAccept: true,
+    workerCancelAfterAcceptPoints: -5,
+    workerCancelAfterJourneyPoints: -8,
+    workerCancelAfterArrivalPoints: -10,
+    workerCancelAfterWorkStartPoints: -12,
+    customerCancelPoints: -10,
+  },
 };
 
 let settingsCache = null;
@@ -79,6 +101,13 @@ const getSettings = async (force = false) => {
     schedulerIntervalSeconds:
       stored.schedulerIntervalSeconds ??
       ENV_DEFAULTS.schedulerIntervalSeconds,
+    cancellation: {
+      ...merge(stored.cancellation, ENV_DEFAULTS.cancellation),
+      suspensionDurations: merge(
+        stored.cancellation?.suspensionDurations,
+        ENV_DEFAULTS.cancellation.suspensionDurations
+      ),
+    },
   };
   cacheLoadedAt = Date.now();
   return settingsCache;

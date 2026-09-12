@@ -54,6 +54,13 @@ export default function BookingDetails() {
   const [filingComplaint, setFilingComplaint] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [showCancel, setShowCancel] = useState(false);
+  const [cancelReasons, setCancelReasons] = useState([]);
+  const [cancelConfig, setCancelConfig] = useState(null);
+  const [cancelReasonKey, setCancelReasonKey] = useState('');
+  const [cancelPreview, setCancelPreview] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const canPay =
     !!booking &&
@@ -184,14 +191,58 @@ export default function BookingDetails() {
     }
   };
 
-  const handleCancel = async () => {
-    if (!window.confirm(t('book.cancelConfirm'))) return;
+  const openCancel = async () => {
+    setCancelPreview(null);
+    setCancelReasonKey('');
+    setShowCancel(true);
     try {
-      await api.put(`/customers/bookings/${id}/cancel`, { reason: 'Cancelled by customer' });
+      const reasonsRes = await api.get('/cancellations/reasons');
+      setCancelReasons(reasonsRes.data?.reasons?.customer || []);
+      setCancelConfig(reasonsRes.data?.config || null);
+    } catch (e) {
+      // reasons/config are enrichment only; fall back to defaults on failure
+      setCancelReasons([
+        { key: 'changed_mind', label: 'Changed my mind', eligible: true },
+        { key: 'no_longer_need', label: 'No longer need service', eligible: true },
+        { key: 'worker_delayed', label: 'Worker is delayed', eligible: false },
+        { key: 'worker_asked_cancel', label: 'Worker asked me to cancel', eligible: false },
+        { key: 'emergency', label: 'Emergency', eligible: false },
+        { key: 'found_other_solution', label: 'Found another solution', eligible: true },
+        { key: 'other', label: 'Other', eligible: true },
+      ]);
+    }
+  };
+
+  const previewCancel = async (key) => {
+    setCancelReasonKey(key);
+    if (!key) {
+      setCancelPreview(null);
+      return;
+    }
+    setPreviewing(true);
+    try {
+      const res = await api.post(`/customers/bookings/${id}/cancel-preview`, { reasonKey: key });
+      setCancelPreview(res.data?.outcome || null);
+    } catch (err) {
+      setCancelPreview(null);
+      toast.error(err.message || t('toast.unknownError'));
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelReasonKey) return;
+    setCancelling(true);
+    try {
+      await api.put(`/customers/bookings/${id}/cancel`, { reasonKey: cancelReasonKey });
       toast.success(t('toast.cancelSuccess'));
+      setShowCancel(false);
       load();
     } catch (err) {
       toast.error(err.message || t('toast.unknownError'));
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -366,7 +417,7 @@ export default function BookingDetails() {
                 <button onClick={handleReassign} className="btn-primary text-sm">
                   🔄 {t('book.findAnotherWorker')}
                 </button>
-                <button onClick={handleCancel} className="btn-danger text-sm">
+                <button onClick={openCancel} className="btn-danger text-sm">
                   ✕ {t('book.cancelRefund')}
                 </button>
                 <button onClick={() => setShowComplaint(true)} className="btn-secondary text-sm">
@@ -562,7 +613,7 @@ export default function BookingDetails() {
             </button>
           )}
           {['REQUESTED', 'MATCHING'].includes(booking.status) && (
-            <button onClick={handleCancel} className="btn-danger text-sm">{t('book.cancelBooking')}</button>
+            <button onClick={openCancel} className="btn-danger text-sm">{t('book.cancelBooking')}</button>
           )}
           {booking.status === 'COMPLETED' && (
             <button onClick={() => handleReview(5)} className="btn-accent text-sm">⭐ {t('book.rate5')}</button>
@@ -658,6 +709,81 @@ export default function BookingDetails() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {showCancel && booking && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">{t('cancel.title', 'Cancel booking')}</h3>
+              <button onClick={() => setShowCancel(false)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <div className="p-6 space-y-5">
+              {cancelConfig && cancelConfig.freeCancelBeforeAccept && ['REQUESTED', 'MATCHING'].includes(booking.status) && (
+                <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+                  {t('cancel.freeBeforeAccept', 'No cancellation fee applies before a worker accepts your request.')}
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-medium text-gray-600">{t('cancel.reasonLabel', 'Why are you cancelling?')} *</label>
+                <select
+                  value={cancelReasonKey}
+                  onChange={(e) => previewCancel(e.target.value)}
+                  className="input-field mt-1"
+                >
+                  <option value="">{t('cancel.selectReason', 'Select a reason')}</option>
+                  {cancelReasons.map((r) => (
+                    <option key={r.key} value={r.key}>{t(`cancel.reasons.${r.key}`, r.label)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {previewing && <p className="text-sm text-gray-500">{t('common.loading')}</p>}
+
+              {!previewing && cancelPreview && (
+                <div className="space-y-2 rounded-lg bg-gray-50 border border-gray-200 px-4 py-3">
+                  {cancelPreview.freePreAccept || cancelPreview.customerPenaltyAmount === 0 ? (
+                    <p className="text-sm text-green-700">
+                      {t('cancel.noFee', 'No cancellation fee will be charged.')}
+                    </p>
+                  ) : (
+                    <p className="text-sm">
+                      <span className="text-gray-700">{t('cancel.feeLabel', 'Cancellation fee')}:</span>{' '}
+                      <span className="font-semibold text-red-600">₹{cancelPreview.customerPenaltyAmount}</span>
+                      <span className="text-gray-500 block text-xs mt-1">
+                        {t('cancel.feeNextBooking', 'This amount is carried to your next booking and collected with its payment.')}
+                      </span>
+                    </p>
+                  )}
+                  {cancelPreview.workerCompensationAmount > 0 && (
+                    <p className="text-sm text-amber-700">
+                      {t('cancel.workerCompensation', 'The worker will be compensated ₹{{amount}} for travel.', {
+                        amount: cancelPreview.workerCompensationAmount,
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {cancelReasonKey && (
+                <div className="text-xs text-gray-500">
+                  {t('cancel.threshold', 'Repeated eligible cancellations can lead to a temporary account suspension.', {})}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setShowCancel(false)} className="btn-secondary text-sm">{t('common.cancel')}</button>
+                <button
+                  type="button"
+                  onClick={confirmCancel}
+                  disabled={!cancelReasonKey || previewing || cancelling}
+                  className="btn-danger text-sm"
+                >
+                  {cancelling ? t('common.loading') : t('book.cancelBooking')}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -22,6 +22,102 @@ export default function ActiveJobs() {
   const [materialJob, setMaterialJob] = useState(null);
   const [materialForm, setMaterialForm] = useState({ description: '', amount: '', note: '' });
   const [materialSubmitting, setMaterialSubmitting] = useState(false);
+  const [cancelFor, setCancelFor] = useState(null);
+  const [cancelReasons, setCancelReasons] = useState([]);
+  const [cancelReasonKey, setCancelReasonKey] = useState('');
+  const [cancelPreview, setCancelPreview] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // Server-gated start time: the UI re-checks every 30s so the Start button
+  // unlocks automatically the moment the scheduled start time arrives.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  const getStartTime = (job) => {
+    const raw = job.effectiveScheduledStartTime || job.scheduledStartTime;
+    return raw ? new Date(raw) : null;
+  };
+
+  const getNavTime = (job) => {
+    const raw = job.effectiveNavigationAvailableTime || job.navigationAvailableTime;
+    return raw ? new Date(raw) : null;
+  };
+
+  const formatTimeLabel = (date) => {
+    const d = new Date(date);
+    let h = d.getHours();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${m} ${ampm}`;
+  };
+
+  const canStart = (job) => {
+    const start = getStartTime(job);
+    return !start || nowMs >= start.getTime();
+  };
+
+  const canNavigate = (job) => {
+    const t = getNavTime(job);
+    return !t || nowMs >= t.getTime();
+  };
+
+  const navDurationTxt = (mins) => {
+    if (mins == null || mins % 60 !== 0) return `${mins || 60} minutes`;
+    const h = mins / 60;
+    return h === 1 ? '1 hour' : `${h} hours`;
+  };
+
+  const renderNavigationButton = (job) => {
+    const available = canNavigate(job);
+    const start = getStartTime(job);
+    return (
+      <div className="flex-1">
+        {!available && (
+          <p className="text-xs text-gray-500 mb-1 text-center">
+            {t('active.availableBeforeJob', { duration: navDurationTxt(job.navigationBufferMinutes) })}
+          </p>
+        )}
+        {available && !canStart(job) && start && (
+          <p className="text-xs text-gray-500 mb-1 text-center">
+            {t('active.jobStartsAt', { time: formatTimeLabel(start) })}
+          </p>
+        )}
+        <button
+          onClick={() => handleStartNav(job._id)}
+          disabled={!available}
+          className={`btn-primary w-full ${available ? '' : 'opacity-60 cursor-not-allowed'}`}
+        >
+          {available ? `🧭 ${t('active.navigateToCustomer')}` : `🔒 ${t('active.navigateToCustomer')}`}
+        </button>
+      </div>
+    );
+  };
+
+  const renderStartButton = (job) => {
+    const ready = canStart(job);
+    const start = getStartTime(job);
+    return (
+      <div className="flex-1">
+        {!ready && start && (
+          <p className="text-xs text-gray-500 mb-1 text-center">
+            {t('active.startAvailableAt', { time: formatTimeLabel(start) })}
+          </p>
+        )}
+        <button
+          onClick={() => handleStatus(job._id, 'STARTED')}
+          disabled={!ready}
+          className={`btn-primary w-full ${ready ? '' : 'opacity-60 cursor-not-allowed'}`}
+        >
+          {ready ? `▶️ ${t('active.startWork')}` : `🔒 ${t('active.startWork')}`}
+        </button>
+      </div>
+    );
+  };
 
   const load = async () => {
     try {
@@ -149,6 +245,59 @@ export default function ActiveJobs() {
     }
   };
 
+  const openCancel = async (job) => {
+    setCancelFor(job);
+    setCancelReasonKey('');
+    setCancelPreview(null);
+    try {
+      const res = await api.get('/cancellations/reasons');
+      setCancelReasons(res.data?.reasons?.worker || []);
+    } catch (e) {
+      setCancelReasons([
+        { key: 'customer_unavailable', label: 'Customer unavailable', eligible: false },
+        { key: 'incorrect_address', label: 'Incorrect address', eligible: false },
+        { key: 'unsafe_situation', label: 'Unsafe situation', eligible: false },
+        { key: 'customer_requested_cancellation', label: 'Customer requested cancellation', eligible: false },
+        { key: 'transport_problem', label: 'Transport problem', eligible: true },
+        { key: 'emergency', label: 'Emergency', eligible: false },
+        { key: 'other', label: 'Other', eligible: false },
+      ]);
+    }
+  };
+
+  const previewCancel = async (key) => {
+    setCancelReasonKey(key);
+    if (!key || !cancelFor) {
+      setCancelPreview(null);
+      return;
+    }
+    setPreviewing(true);
+    try {
+      const res = await api.post(`/workers/jobs/${cancelFor._id}/cancel-preview`, { reasonKey: key });
+      setCancelPreview(res.data?.outcome || null);
+    } catch (err) {
+      setCancelPreview(null);
+      toast.error(err.message || t('toast.unknownError'));
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelReasonKey || !cancelFor) return;
+    setCancelling(true);
+    try {
+      await api.put(`/workers/jobs/${cancelFor._id}/cancel`, { reasonKey: cancelReasonKey });
+      toast.success(t('toast.cancelSuccess'));
+      setCancelFor(null);
+      load();
+    } catch (err) {
+      toast.error(err.message || t('toast.unknownError'));
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   const openMaterialModal = (job) => {
     setMaterialForm({ description: '', amount: '', note: '' });
     setMaterialJob(job);
@@ -238,18 +387,18 @@ export default function ActiveJobs() {
                   )}
                   {job.status === 'ACCEPTED' && (
                     <>
-                      <button onClick={() => handleStartNav(job._id)} className="btn-primary flex-1">🚗 {t('active.onMyWay')}</button>
+                      {renderNavigationButton(job)}
                       <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 {t('active.arrived')}</button>
                     </>
                   )}
                   {job.status === 'ON_THE_WAY' && (
                     <>
                       <button onClick={() => handleArrive(job._id)} className="btn-accent flex-1">📍 {t('active.arrived')}</button>
-                      <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 {t('active.startWork')}</button>
+                      {renderStartButton(job)}
                     </>
                   )}
                   {job.status === 'WORKER_ARRIVED' && (
-                    <button onClick={() => handleStatus(job._id, 'STARTED')} className="btn-primary flex-1">🔧 {t('active.startWork')}</button>
+                    renderStartButton(job)
                   )}
                   {['STARTED', 'IN_PROGRESS'].includes(job.status) && (
                     <button onClick={() => handleComplete(job._id)} className="btn-success flex-1">✓ {t('active.completeJob')}</button>
@@ -262,10 +411,23 @@ export default function ActiveJobs() {
                   </button>
                 )}
 
+                {['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) && (
+                  <button
+                    onClick={() => openCancel(job)}
+                    className="text-xs font-medium text-red-600 hover:text-red-700 mt-3 underline decoration-dotted underline-offset-2"
+                  >
+                    {t('active.cancelJob')}
+                  </button>
+                )}
+
                 {['ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'].includes(job.status) &&
                   Array.isArray(job.location?.coordinates) && job.location.coordinates.length >= 2 && (
-                  <button onClick={() => setNavJob(job)} className="btn-secondary text-sm mt-2 w-full border-brand-200 text-brand-700">
-                    🧭 {t('active.navigateToJob')}
+                  <button
+                    onClick={() => canNavigate(job) && setNavJob(job)}
+                    disabled={!canNavigate(job)}
+                    className="btn-secondary text-sm mt-2 w-full border-brand-200 text-brand-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {canNavigate(job) ? `🧭 ${t('active.navigateToJob')}` : `🔒 ${t('active.navigateToJob')}`}
                   </button>
                 )}
 
@@ -455,6 +617,74 @@ export default function ActiveJobs() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+    {/* Cancel job modal */}
+      {cancelFor && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900">{t('cancel.workerTitle', 'Cancel this job')}</h3>
+              <button onClick={() => setCancelFor(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
+            </div>
+            <div className="p-6 space-y-5">
+              <p className="text-sm text-gray-500">
+                {t('cancel.workerRef', 'Job {{number}} · {{service}}', {
+                  number: cancelFor.bookingNumber,
+                  service: cancelFor.serviceSnapshot?.name,
+                })}
+              </p>
+              <div>
+                <label className="text-xs font-medium text-gray-600">{t('cancel.reasonLabel', 'Why are you cancelling?')} *</label>
+                <select
+                  value={cancelReasonKey}
+                  onChange={(e) => previewCancel(e.target.value)}
+                  className="input-field mt-1"
+                >
+                  <option value="">{t('cancel.selectReason', 'Select a reason')}</option>
+                  {cancelReasons.map((r) => (
+                    <option key={r.key} value={r.key}>{t(`cancel.workerReasons.${r.key}`, r.label)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {previewing && <p className="text-sm text-gray-500">{t('common.loading')}</p>}
+
+              {!previewing && cancelPreview && (
+                <div className="space-y-2 rounded-lg bg-gray-50 border border-gray-200 px-4 py-3">
+                  {cancelPreview.workerMeritPoints === 0 ? (
+                    <p className="text-sm text-green-700">
+                      {t('cancel.workerNoPenalty', 'No merit deduction applies for this reason.')}
+                    </p>
+                  ) : (
+                    <p className="text-sm">
+                      <span className="text-gray-700">{t('cancel.workerMeritLabel', 'Merit deduction')}:</span>{' '}
+                      <span className="font-semibold text-red-600">{cancelPreview.workerMeritPoints} pts</span>
+                    </p>
+                  )}
+                  {cancelPreview.workerCompensationAmount > 0 && (
+                    <p className="text-sm text-amber-700">
+                      {t('cancel.workerCompensation', 'The customer will pay ₹{{amount}} travel compensation.', {
+                        amount: cancelPreview.workerCompensationAmount,
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => setCancelFor(null)} className="btn-secondary text-sm">{t('common.cancel')}</button>
+                <button
+                  type="button"
+                  onClick={confirmCancel}
+                  disabled={!cancelReasonKey || previewing || cancelling}
+                  className="btn-danger text-sm"
+                >
+                  {cancelling ? t('common.loading') : t('active.cancelJob')}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

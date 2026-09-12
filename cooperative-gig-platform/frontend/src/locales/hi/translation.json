@@ -85,6 +85,7 @@
     "demandHeatmap": "मांग हीटमैप",
     "aiForecasting": "AI पूर्वानुमान",
     "reliability": "विश्वसनीयता",
+    "suspensions": "निलंबन",
     "workerWelfare": "कार्यकर्ता कल्याण",
     "settings": "सेटिंग्स",
     "logout": "लॉग आउट",
@@ -200,6 +201,45 @@
     "emergencyAvailable": "⚡ आपातकालीन सेवा उपलब्ध",
     "bookNow": "अभी बुक करें",
     "getDirections": "दिशा-निर्देश पाएं"
+  },
+  "cancel": {
+    "title": "बुकिंग रद्द करें",
+    "workerTitle": "यह काम रद्द करें",
+    "workerRef": "काम {{number}} · {{service}}",
+    "reasonLabel": "आप क्यों रद्द कर रहे हैं?",
+    "selectReason": "कारण चुनें",
+    "noFee": "कोई रद्दीकरण शुल्क नहीं लगेगा।",
+    "feeLabel": "रद्दीकरण शुल्क",
+    "feeNextBooking": "यह राशि आपकी अगली बुकिंग में जोड़ी जाएगी और उसके भुगतान के साथ वसूली जाएगी।",
+    "workerCompensation": "यात्रा के लिए कारीगर को ₹{{amount}} मुआवज़ा दिया जाएगा।",
+    "workerNoPenalty": "इस कारण के लिए कोई अंक कटौती नहीं होगी।",
+    "workerMeritLabel": "अंक कटौती",
+    "threshold": "बार-बार पात्र रद्दीकरण से अस्थायी खाता निलंबन हो सकता है।",
+    "suspended": "आपका खाता अस्थायी रूप से निलंबित है",
+    "suspendedUntil": "{{date}} तक आप नई बुकिंग नहीं बना सकते।",
+    "suspendedNoDate": "निलंबन के दौरान आप नई बुकिंग नहीं बना सकते।",
+    "suspendedHint": "बार-बार पात्र रद्दीकरण के बाद स्वचालित निलंबन होता है। यदि यह गलती है तो सहायता से संपर्क करें।",
+    "outstandingBalance": "बकाया रद्दीकरण राशि",
+    "outstandingMsg": "रद्द की गई बुकिंग से आपके पास ₹{{amount}} बकाया है। इसे इस बुकिंग के भुगतान के साथ वसूला जाएगा।",
+    "freeBeforeAccept": "कारीगर के अनुरोध स्वीकार करने से पहले कोई रद्दीकरण शुल्क नहीं लगता।",
+    "reasons": {
+      "changed_mind": "मन बदल गया",
+      "no_longer_need": "सेवा की आवश्यकता नहीं",
+      "worker_delayed": "कारीगर देरी से आएगा",
+      "worker_asked_cancel": "कारीगर ने रद्द करने को कहा",
+      "emergency": "आपातकाल",
+      "found_other_solution": "दूसरा समाधान मिल गया",
+      "other": "अन्य"
+    },
+    "workerReasons": {
+      "customer_unavailable": "ग्राहक उपलब्ध नहीं",
+      "incorrect_address": "गलत पता",
+      "unsafe_situation": "असुरक्षित स्थिति",
+      "customer_requested_cancellation": "ग्राहक ने रद्द करने को कहा",
+      "transport_problem": "परिवहन समस्या",
+      "emergency": "आपातकाल",
+      "other": "अन्य"
+    }
   },
   "create": {
     "title": "सेवा अनुरोध बनाएं",
@@ -526,7 +566,13 @@
     "noTeamYet": "अभी कोई टीम सदस्य नहीं",
     "pendingApproval": "स्वीकृति लंबित",
     "requestCollab": "सहयोगी आमंत्रित करें",
-    "submitting": "सबमिट हो रहा है..."
+    "submitting": "सबमिट हो रहा है...",
+    "scheduledFor": "काम {{time}} पर शुरू होगा",
+    "navigateToCustomer": "ग्राहक के पास जाएँ",
+    "availableBeforeJob": "काम से {{duration}} पहले उपलब्ध",
+    "jobStartsAt": "काम {{time}} पर शुरू होगा",
+    "startAvailableAt": "{{time}} पर उपलब्ध",
+    "cancelJob": "काम रद्द करें"
   },
   "hist": {
     "title": "काम का इतिहास",
@@ -583,7 +629,6 @@
     "rating": "रेटिंग",
     "completedJobs": "पूर्ण किए गए काम",
     "memberSince": "सदस्य तब से",
-    "certTitlePrompt": "प्रमाण पत्र का शीर्षक:",
     "statusLabel": "स्थिति:",
     "completenessMsg": "प्रोफ़ाइल पूर्णता आपके मैचिंग स्कोर को प्रभावित करती है",
     "reliabilityScore": "विश्वसनीयता स्कोर",
@@ -609,10 +654,7 @@
     "add": "जोड़ें",
     "years": "वर्ष",
     "verified": "✓ सत्यापित",
-    "pendingApproval": "⏳ स्वीकृति लंबित",
-    "certificates": "प्रमाण पत्र",
-    "uploadCertificate": "प्रमाण पत्र अपलोड करें",
-    "noCerts": "कोई प्रमाण पत्र अपलोड नहीं"
+    "pendingApproval": "⏳ स्वीकृति लंबित"
   },
   "collab": {
     "title": "साझेदारी",
@@ -810,7 +852,6 @@
     "profileUpdated": "प्रोफ़ाइल अपडेट हो गई!",
     "selectSkillFirst": "पहले एक कौशल चुनें",
     "skillAdded": "कौशल जोड़ दिया गया। यह केवल प्रशासक सत्यापन के बाद कामों से मैच होगा।",
-    "certUploaded": "प्रमाण पत्र अपलोड हो गया!",
     "statusUpdated": "स्थिति अपडेट हो गई"
   },
   "loc": {
@@ -980,5 +1021,68 @@
         "q": "मैं सेवा कैसे बुक करूँ?"
       }
     }
+  },
+  "custprof": {
+    "title": "मेरी प्रोफ़ाइल",
+    "subtitle": "विश्वसनीयता स्थिति, निलंबन और रद्दीकरण इतिहास",
+    "suspendedTitle": "आपका खाता अस्थायी रूप से निलंबित है",
+    "suspendedUntil": "आप {{date}} तक नई बुकिंग नहीं बना सकते।",
+    "suspendedNoDate": "निलंबित रहने के दौरान आप नई बुकिंग नहीं बना सकते।",
+    "suspendedAfter": "आपका निलंबन समाप्त होने के बाद आप फिर से सेवाएँ बुक कर सकते हैं",
+    "suspendedContact": "यह निलंबन बार-बार के पात्र रद्दीकरणों के कारण स्वचालित रूप से लागू किया गया था।",
+    "contactSupport": "सहायता से संपर्क करें या आपत्ति दर्ज करें",
+    "reliabilityTitle": "विश्वसनीयता स्कोर",
+    "cancellationStatus": "रद्दीकरण स्थिति",
+    "eligibleCount": "पात्र रद्दीकरण:",
+    "meritScore": "मेरिट स्कोर:",
+    "thresholdHint": "बार-बार पात्र रद्दीकरण से अस्थायी खाता निलंबन होता है।",
+    "outstandingBalance": "बकाया राशि",
+    "outstandingHint": "अवैतनिक रद्दीकरण शुल्क, आपकी अगली बुकिंग के साथ वसूला जाएगा।",
+    "historyTitle": "रद्दीकरण इतिहास",
+    "historyEmpty": "अभी कोई रद्दीकरण नहीं।",
+    "hDate": "तिथि",
+    "hService": "सेवा",
+    "hStage": "चरण",
+    "hFee": "शुल्क",
+    "hReason": "कारण",
+    "stage": {
+      "PRE_ACCEPT": "स्वीकृति से पहले",
+      "POST_ACCEPT": "स्वीकृति के बाद",
+      "JOURNEY": "रास्ते में",
+      "ARRIVED": "पहुँचने पर",
+      "WORK_STARTED": "कार्य शुरू होने पर"
+    },
+    "levelGood": "अच्छी स्थिति",
+    "levelFair": "ठीक स्थिति",
+    "levelLow": "कम विश्वसनीयता",
+    "levelCritical": "गंभीर"
+  },
+  "admSusp": {
+    "title": "निलंबित खाते",
+    "subtitle": "बार-बार पात्र रद्दीकरण से अस्थायी निलंबन और व्यवस्थापक द्वारा निलंबन समाप्ति",
+    "tab": {
+      "customers": "ग्राहक",
+      "workers": "कार्यकर्ता",
+      "logs": "ऑडिट लॉग"
+    },
+    "filter": {
+      "all": "सभी",
+      "suspended": "वर्तमान में निलंबित",
+      "recent": "हाल ही में निलंबित",
+      "highCancels": "अधिक रद्दीकरण संख्या",
+      "lowScore": "कम विश्वसनीयता",
+      "auto": "स्वचालित निलंबन"
+    },
+    "allActions": "सभी क्रियाएँ",
+    "entries": "प्रविष्टियाँ",
+    "records": "रिकॉर्ड",
+    "searchPlaceholder": "नाम / ईमेल / फ़ोन द्वारा खोजें…",
+    "empty": "कोई रिकॉर्ड नहीं मिला",
+    "unsuspend": "निलंबन समाप्त करें",
+    "unsuspendSuccess": "खाता निलंबन समाप्त",
+    "unsuspendPromptTitle": "खाता निलंबन समाप्त करें",
+    "unsuspendPromptFor": "आप निलंबन समाप्त कर रहे हैं:",
+    "unsuspendReasonPlaceholder": "कारण (उपयोगकर्ता को दिखाया जाएगा)…",
+    "confirmUnsuspend": "निलंबन समाप्ति की पुष्टि करें"
   }
 }

@@ -51,13 +51,15 @@ const initiatePayment = asyncHandler(async (req, res) => {
 
   const coop = await Cooperative.findOne().sort({ createdAt: -1 });
   const workerProfile = booking.worker ? await Worker.findById(booking.worker) : null;
+  const carriedAmount = Math.round((booking.carriedCancellationBalance || 0) * 100) / 100;
 
   // Create payment
   const payment = await paymentService.createPayment({
     booking: booking._id,
     customer: booking.customer,
     worker: booking.worker,
-    amount: booking.priceBreakdown.total,
+    amount: booking.priceBreakdown.total + carriedAmount,
+    carriedCancellationBalance: carriedAmount,
     labourAmount: booking.priceBreakdown.labour,
     materialsAmount: booking.priceBreakdown.materials,
     cooperativeContribution: booking.priceBreakdown.cooperativeContribution,
@@ -104,6 +106,18 @@ const initiatePayment = asyncHandler(async (req, res) => {
     if (workerProfile) {
       workerProfile.totalEarnings = (workerProfile.totalEarnings || 0) + payment.workerNetEarnings;
       await workerProfile.save();
+    }
+
+    // Settle any cancellation balance carried from a previous cancelled
+    // booking — now that this payment has actually succeeded.
+    if (carriedAmount > 0) {
+      const { settleCarriedCancellationBalance } = require('../../services/cancellation/cancellationService');
+      const updated = await Booking.findById(booking._id).catch(() => null);
+      if (updated) {
+        await settleCarriedCancellationBalance({ booking: updated }).catch((e) =>
+          console.error('[payment] cancellation settlement error:', e.message)
+        );
+      }
     }
 
     // Notify customer & worker
