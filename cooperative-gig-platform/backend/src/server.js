@@ -8,6 +8,7 @@ const path = require('path');
 
 const connectDB = require('./config/db');
 const { port, clientURL } = require('./config/env');
+const { errors, printIssues } = require('./config/startupChecks');
 const { errorHandler, notFound } = require('./middleware/errorMiddleware');
 const { setIO } = require('./config/socket');
 
@@ -136,6 +137,13 @@ app.use(errorHandler);
 // ---------- Start Server ----------
 const startServer = async () => {
   try {
+    // Fail loudly at boot on a broken env instead of mid-request (e.g. the
+    // "Unable to send the verification email" 502 from missing SMTP credentials).
+    printIssues();
+    if (errors.length > 0) {
+      console.error('\n[config] REFUSING TO START due to invalid environment. Fix the values above and restart.');
+      process.exit(1);
+    }
     await connectDB();
     server.listen(port, async () => {
       console.log(`🚀 Server running on port ${port}`);
