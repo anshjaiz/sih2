@@ -5,7 +5,6 @@ const env = require('../config/env');
 const User = require('../models/User');
 const Customer = require('../models/CustomerProfile');
 const Worker = require('../models/WorkerProfile');
-const EmailVerification = require('../models/EmailVerification');
 const Notification = require('../models/Notification');
 const Booking = require('../models/Booking');
 const Review = require('../models/Review');
@@ -46,11 +45,9 @@ const main = async () => {
   }
 
   const targetIds = targetUsers.map((u) => u._id);
-  const targetEmails = targetUsers.map((u) => u.email);
   const workerProfileIds = (await Worker.find({ user: { $in: targetIds } }).select('_id')).map((w) => w._id);
 
   const relatedDeletes = [
-    { model: EmailVerification, filter: { email: { $in: targetEmails } }, label: 'email verifications' },
     { model: Notification, filter: { $or: [{ user: { $in: targetIds } }, { 'data.userId': { $in: targetIds } }] }, label: 'notifications' },
     { model: Booking, filter: { $or: [{ customer: { $in: targetIds } }, { worker: { $in: workerProfileIds } }] }, label: 'bookings' },
     { model: Review, filter: { $or: [{ reviewer: { $in: targetIds } }, { reviewee: { $in: targetIds } }] }, label: 'reviews' },

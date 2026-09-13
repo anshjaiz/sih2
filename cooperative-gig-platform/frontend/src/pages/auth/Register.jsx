@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import OtpVerify from '../../components/auth/OtpVerify';
 import LanguageSelector from '../../components/LanguageSelector';
 import toast from 'react-hot-toast';
 import { HiOutlineBriefcase, HiOutlineHomeModern, HiOutlineShieldCheck, HiOutlineUsers } from 'react-icons/hi2';
@@ -10,7 +9,6 @@ import { HiOutlineBriefcase, HiOutlineHomeModern, HiOutlineShieldCheck, HiOutlin
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', role: 'customer' });
   const [loading, setLoading] = useState(false);
-  const [verifyEmail, setVerifyEmail] = useState(null);
   const { register } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -30,12 +28,9 @@ export default function Register() {
     setLoading(true);
     try {
       const result = await register(form);
-      if (result.success && result.requiresVerification) {
-        toast.success(result.message || t('toast.checkEmailCode'));
-        setVerifyEmail({ email: form.email.trim().toLowerCase(), role: form.role });
-      } else if (result.success) {
-        toast.success(t('toast.registerSuccess'));
-        navigate(`/${form.role === 'worker' ? 'worker' : 'customer'}`);
+      if (result.success) {
+        toast.success(result.message || t('toast.registerSuccess'));
+        navigate('/login');
       } else {
         toast.error(result.message || t('toast.registrationFailed'));
       }
@@ -44,24 +39,6 @@ export default function Register() {
     }
     setLoading(false);
   };
-
-  const handleVerified = (data) => {
-    const role = data.user?.role;
-    navigate(`/${role === 'worker' ? 'worker' : 'customer'}`);
-  };
-
-  if (verifyEmail) {
-    return (
-      <div className="auth-page flex items-center justify-center p-4">
-        <div className="absolute top-4 right-4"><LanguageSelector /></div>
-        <OtpVerify
-          email={verifyEmail.email}
-          onVerified={handleVerified}
-          onBack={() => setVerifyEmail(null)}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="auth-page flex items-center justify-center p-4 sm:p-8">

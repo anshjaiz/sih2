@@ -21,17 +21,6 @@ module.exports = {
     const n = parseFloat(process.env.PRE_JOB_NAVIGATION_BUFFER);
     return Number.isFinite(n) && n >= 0 ? n : 60;
   })(),
-  // ── Email verification OTPs (Gmail SMTP via Nodemailer) ──────────────
-  // Gmail account that sends the OTPs. pass is a Google App Password
-  // (https://myaccount.google.com/apppasswords) — 16 chars, no spaces.
-  // Config is read from env only; credentials are never exposed to the API.
-  emailUser: process.env.EMAIL_USER || '',
-  emailAppPassword: String(process.env.EMAIL_APP_PASSWORD || '').replace(/\s+/g, ''),
-  // DEV ONLY: when the SMTP send fails (e.g. app password not set yet), log
-  // + return the OTP so registration keeps working in local demos. NEVER
-  // enable in production.
-  otpConsoleFallback: ['true', '1'].includes(String(process.env.OTP_CONSOLE_FALLBACK || '').toLowerCase()),
-
   // ── Payments (Razorpay TEST mode) ──────────────────────────────────
   // Leave RAZORPAY_KEY_ID + RAZORPAY_KEY_SECRET empty to run the
   // built-in MOCK gateway (instant success, safe for offline demo).

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTranslation } from 'react-i18next';
-import OtpVerify from '../../components/auth/OtpVerify';
 import LanguageSelector from '../../components/LanguageSelector';
 import toast from 'react-hot-toast';
 import { HiEye, HiEyeOff } from 'react-icons/hi';
@@ -13,7 +12,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [verifyEmail, setVerifyEmail] = useState(null);
   const { login } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -31,8 +29,6 @@ export default function Login() {
         toast.success(t('toast.loginSuccess'));
         const role = result.data.user.role;
         navigate(`/${role === 'worker' ? 'worker' : role === 'admin' ? 'admin' : 'customer'}`);
-      } else if (/verify your email/i.test(result.message || '')) {
-        setVerifyEmail(email);
       } else {
         toast.error(result.message || t('toast.loginFailed'));
       }
@@ -41,25 +37,6 @@ export default function Login() {
     }
     setLoading(false);
   };
-
-  const handleVerified = (data) => {
-    const role = data.user?.role;
-    navigate(`/${role === 'worker' ? 'worker' : 'customer'}`);
-  };
-
-  if (verifyEmail) {
-    return (
-      <div className="auth-page flex items-center justify-center p-4">
-        <div className="absolute top-4 right-4"><LanguageSelector /></div>
-        <OtpVerify
-          email={verifyEmail}
-          onVerified={handleVerified}
-          onBack={() => setVerifyEmail(null)}
-          heading={t('auth.verificationCodeToSignIn')}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="auth-page flex items-center justify-center p-4 sm:p-8">

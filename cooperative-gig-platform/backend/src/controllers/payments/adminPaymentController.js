@@ -9,6 +9,7 @@ const Payment = require('../../models/Payment');
 const Payout = require('../../models/Payout');
 const Booking = require('../../models/Booking');
 const WorkerWallet = require('../../models/WorkerWallet');
+const WalletTransaction = require('../../models/WalletTransaction');
 const Worker = require('../../models/WorkerProfile');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 const walletService = require('../../services/wallet/walletService');
@@ -27,6 +28,7 @@ const getPaymentOverview = asyncHandler(async (req, res) => {
     payoutPendingAgg,
     payoutCompletedAgg,
     completedPaymentsAgg,
+    compAgg,
   ] = await Promise.all([
     Payment.aggregate([
       { $match: { status: { $in: ['PAID', 'SUCCESS'] } } },
@@ -57,6 +59,11 @@ const getPaymentOverview = asyncHandler(async (req, res) => {
       { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
     ]),
     Booking.countDocuments({ paymentStatus: 'PAID' }),
+    // Cancellation travel compensation actually credited to workers
+    WalletTransaction.aggregate([
+      { $match: { type: 'ADJUSTMENT', status: 'COMPLETED' } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+    ]),
   ]);
 
   // Recent payments, latest first.
@@ -82,6 +89,8 @@ const getPaymentOverview = asyncHandler(async (req, res) => {
         pendingPayouts: round2(payoutPendingAgg[0]?.total || 0),
         pendingPayoutCount: payoutPendingAgg[0]?.count || 0,
         completedPayouts: round2(payoutCompletedAgg[0]?.total || 0),
+        workerCompensationPaid: round2(compAgg[0]?.total || 0),
+        workerCompensationCount: compAgg[0]?.count || 0,
         paidBookings: completedPaymentsAgg || 0,
       },
       recent,
@@ -103,6 +112,20 @@ const getAllPayments = asyncHandler(async (req, res) => {
     .limit(200);
 
   res.json({ success: true, data: payments });
+});
+
+// GET /api/admin/payments/compensations — travel compensation credited to workers
+const getAllCompensations = asyncHandler(async (req, res) => {
+  const compensations = await WalletTransaction.find({
+    type: 'ADJUSTMENT',
+    status: 'COMPLETED',
+  })
+    .populate('worker', 'user')
+    .populate('booking', 'bookingNumber serviceSnapshot')
+    .sort({ createdAt: -1 })
+    .limit(200);
+
+  res.json({ success: true, data: compensations });
 });
 
 // GET /api/admin/payouts
@@ -167,4 +190,4 @@ const updatePayoutStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, message: `Payout ${status}`, data: payout });
 });
 
-module.exports = { getPaymentOverview, getAllPayments, getAllPayouts, updatePayoutStatus };
+module.exports = { getPaymentOverview, getAllPayments, getAllCompensations, getAllPayouts, updatePayoutStatus };

@@ -40,6 +40,7 @@ const {
 const { protect, authorize } = require('../middleware/authMiddleware');
 const {
   getPaymentOverview,
+  getAllCompensations,
   getAllPayouts,
   updatePayoutStatus,
 } = require('../controllers/payments/adminPaymentController');
@@ -130,6 +131,7 @@ router.get('/bookings', getAllBookings);
 // Payments
 router.get('/payments', getAllPayments);
 router.get('/payments/overview', getPaymentOverview);
+router.get('/payments/compensations', getAllCompensations);
 
 // Payouts (worker withdrawal management)
 router.get('/payouts', getAllPayouts);

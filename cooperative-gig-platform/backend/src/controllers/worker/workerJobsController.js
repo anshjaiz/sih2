@@ -4,6 +4,7 @@ const JobTeam = require('../../models/JobTeam');
 const Notification = require('../../models/Notification');
 const Payment = require('../../models/Payment');
 const Invoice = require('../../models/Invoice');
+const WalletTransaction = require('../../models/WalletTransaction');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 const syncWorkerLocation = require('../../utils/syncWorkerLocation');
 const { getIO } = require('../../config/socket');
@@ -87,7 +88,9 @@ const getWorkerDashboard = asyncHandler(async (req, res) => {
     upcomingJobs,
     recentCompleted,
     totalEarningsAgg,
+    totalCompensationAgg,
     weeklyEarningsAgg,
+    weeklyCompensationAgg,
   ] = await Promise.all([
     // Active/ongoing jobs
     Booking.find({
@@ -131,6 +134,12 @@ const getWorkerDashboard = asyncHandler(async (req, res) => {
       { $group: { _id: null, total: { $sum: '$workerNetEarnings' } } },
     ]),
 
+    // Cancellation travel compensation credited to the wallet
+    WalletTransaction.aggregate([
+      { $match: { worker: workerId, type: 'ADJUSTMENT', status: 'COMPLETED' } },
+      { $group: { _id: null, total: { $sum: '$amount' } } },
+    ]),
+
     // This week's earnings
     (() => {
       const startOfWeek = new Date(now);
@@ -141,6 +150,17 @@ const getWorkerDashboard = asyncHandler(async (req, res) => {
         { $group: { _id: null, total: { $sum: '$workerNetEarnings' } } },
       ]);
     })(),
+
+    // Compensation credited this week
+    (() => {
+      const startOfWeek = new Date(now);
+      startOfWeek.setHours(0, 0, 0, 0);
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+      return WalletTransaction.aggregate([
+        { $match: { worker: workerId, type: 'ADJUSTMENT', status: 'COMPLETED', createdAt: { $gte: startOfWeek } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]);
+    })(),
   ]);
 
   res.json({
@@ -148,8 +168,12 @@ const getWorkerDashboard = asyncHandler(async (req, res) => {
     data: {
       profile: worker,
       stats: {
-        totalEarnings: totalEarningsAgg.length ? totalEarningsAgg[0].total : 0,
-        weeklyEarnings: weeklyEarningsAgg.length ? weeklyEarningsAgg[0].total : 0,
+        totalEarnings:
+          (totalEarningsAgg.length ? totalEarningsAgg[0].total : 0) +
+          (totalCompensationAgg.length ? totalCompensationAgg[0].total : 0),
+        weeklyEarnings:
+          (weeklyEarningsAgg.length ? weeklyEarningsAgg[0].total : 0) +
+          (weeklyCompensationAgg.length ? weeklyCompensationAgg[0].total : 0),
         activeJobs: activeJobs.length,
         pendingRequests: pendingRequests.length,
         completedJobs: worker.completedJobs,

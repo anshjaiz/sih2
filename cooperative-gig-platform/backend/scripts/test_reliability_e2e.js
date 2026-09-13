@@ -344,21 +344,33 @@ const createBooking = async (token, overrides = {}) => {
     check('CASE completedCount incremented', s.doc.completedCount === 1, `got ${s.doc.completedCount}`);
   } catch (e) { check('CASE completion bonus', false, e.stack); }
 
-  // ============ CASE 4: job expiry ============
+  // ============ CASE 4: job expiry (only after scheduled END time + grace) ============
   try {
     s = await score();
     const preExpiry = s.doc.score;
     const B7 = await createBooking(customerToken, { description: 'E2E expiry test job' });
+    const startMs = Date.now() - 4 * 3600 * 1000; // 4h ago
     await Booking.updateOne({ _id: B7._id }, { $set: {
       status: 'MATCHING',
-      scheduledStartTime: new Date(Date.now() - 3 * 3600 * 1000),
-      scheduledEndTime: new Date(Date.now() + 2 * 3600 * 1000),
+      scheduledStartTime: new Date(startMs),
+      scheduledEndTime: new Date(Date.now() - 3 * 3600 * 1000), // ended 3h ago (> 2h grace)
     } });
     await runSchedulerOnce();
     const b7 = await Booking.findById(B7._id).lean();
     check('CASE4 stale booking expired', b7.status === 'EXPIRED' && b7.expiredAt, `${b7.status}`);
     s = await score();
     check('CASE4 expiry does not penalise worker', s.doc.score === preExpiry, `score ${preExpiry} -> ${s.doc.score}`);
+
+    // CASE 4b: a job whose scheduled END is still in the future must NOT expire.
+    const B7b = await createBooking(customerToken, { description: 'E2E no-expire-yet test job' });
+    await Booking.updateOne({ _id: B7b._id }, { $set: {
+      status: 'MATCHING',
+      scheduledStartTime: new Date(Date.now() - 3 * 3600 * 1000), // started 3h ago
+      scheduledEndTime: new Date(Date.now() + 2 * 3600 * 1000),  // ends in 2h — must stay open
+    } });
+    await runSchedulerOnce();
+    const b7b = await Booking.findById(B7b._id).lean();
+    check('CASE4b future-ending job NOT expired', b7b.status === 'MATCHING', `${b7b.status}`);
   } catch (e) { check('CASE4 expiry', false, e.message); }
 
   // ============ CASE 13: collaboration no-show + stale-open expiry ============

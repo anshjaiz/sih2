@@ -91,22 +91,24 @@ const markExceeded = async (booking, status, note, customerType, customerTitle, 
 
 /**
  * Expire stale, never-started jobs.
- * Uses the effective schedule (legacy null-schedule bookings derive one from
- * requestedDate + timeSlot), so pre-scheduling-phase jobs are enforced too.
+ * Uses the effective schedule END time (legacy null-schedule bookings derive
+ * one from requestedDate + timeSlot), so pre-scheduling-phase jobs are
+ * enforced too. Jobs are not expired until after their scheduled end time
+ * plus the grace period.
  */
 const handleExpiredJobs = async (settings, now) => {
   const cutoff = new Date(now.getTime() - settings.jobExpiryGraceMinutes * minuteMs);
   const stale = await Booking.find({
     status: { $in: ['REQUESTED', 'MATCHING', 'ASSIGNED'] },
     $or: [
-      { scheduledStartTime: { $lte: cutoff } },
-      { scheduledStartTime: null },
+      { scheduledEndTime: { $lte: cutoff } },
+      { scheduledEndTime: null },
     ],
   }).select('_id bookingNumber customer status requestedDate timeSlot isEmergency scheduledStartTime scheduledEndTime');
   const results = [];
   for (const b of stale) {
-    const { scheduledStartTime: effectiveStart } = resolveScheduleTimes(b);
-    if (!effectiveStart || effectiveStart.getTime() > cutoff.getTime()) continue;
+    const { scheduledEndTime: effectiveEnd } = resolveScheduleTimes(b);
+    if (!effectiveEnd || effectiveEnd.getTime() > cutoff.getTime()) continue;
     const updated = await markExceeded(
       b,
       'EXPIRED',

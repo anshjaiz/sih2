@@ -137,8 +137,7 @@ app.use(errorHandler);
 // ---------- Start Server ----------
 const startServer = async () => {
   try {
-    // Fail loudly at boot on a broken env instead of mid-request (e.g. the
-    // "Unable to send the verification email" 502 from missing SMTP credentials).
+    // Fail loudly at boot on a broken env instead of mid-request.
     printIssues();
     if (errors.length > 0) {
       console.error('\n[config] REFUSING TO START due to invalid environment. Fix the values above and restart.');

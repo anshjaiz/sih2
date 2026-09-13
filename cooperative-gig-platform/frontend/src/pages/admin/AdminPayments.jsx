@@ -25,18 +25,21 @@ export default function AdminPayments() {
   const [overview, setOverview] = useState(null);
   const [payouts, setPayouts] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [compensations, setCompensations] = useState([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState('');
 
   const reload = useCallback(async () => {
     try {
-      const [ov, po] = await Promise.all([
+      const [ov, po, co] = await Promise.all([
         api.get('/admin/payments/overview'),
         api.get('/admin/payouts'),
+        api.get('/admin/payments/compensations'),
       ]);
       setOverview(ov.data?.overview || {});
       setPayouts(po.data || []);
+      setCompensations(co.data || []);
     } catch (err) {
       toast.error(err.message || 'Could not load payments');
     } finally {
@@ -105,6 +108,7 @@ export default function AdminPayments() {
         <StatCard label="Refunds" value={inr(overview.refunds)} sub={`${overview.refundCount || 0} refunded`} cls="text-orange-600" />
         <StatCard label="Pending Payouts" value={inr(overview.pendingPayouts)} sub={`${overview.pendingPayoutCount || 0} awaiting review`} cls="text-yellow-700" />
         <StatCard label="Completed Payouts" value={inr(overview.completedPayouts)} sub="Paid out to workers" cls="text-emerald-700" />
+        <StatCard label="Worker Compensation Paid" value={inr(overview.workerCompensationPaid)} sub={`${overview.workerCompensationCount || 0} credits from cancellations`} cls="text-violet-700" />
         <StatCard label="Paid Bookings" value={overview.paidBookings || 0} sub="Bookings PAID" />
         <StatCard label="Failed Payments" value={overview.failedCount || 0} sub="Retry / investigate" cls="text-red-600" />
       </div>
@@ -144,6 +148,43 @@ export default function AdminPayments() {
                   <td className="px-5 py-3 text-right font-bold">{inr(p.amount)}</td>
                   <td className="px-5 py-3 text-right text-gray-500">{inr(p.platformFee)}</td>
                   <td className="px-5 py-3"><span className={`badge ${PAYMENT_STATUS[p.status] || 'bg-gray-100 text-gray-600'}`}>{p.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Compensation transfers (cancellation travel compensation) ── */}
+      <div className="card p-0 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <h3 className="font-semibold">Worker Compensation Transfers</h3>
+          <p className="text-xs text-gray-400 mt-0.5">Travel compensation credited to workers when a customer cancels after the worker set out.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
+              <tr>
+                <th className="px-5 py-3">Worker</th>
+                <th className="px-5 py-3">Booking</th>
+                <th className="px-5 py-3">Date</th>
+                <th className="px-5 py-3 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {compensations.length === 0 && (
+                <tr><td colSpan="4" className="px-5 py-8 text-center text-gray-400">No compensation transfers yet</td></tr>
+              )}
+              {compensations.map((c) => (
+                <tr key={c._id} className="hover:bg-gray-50/60">
+                  <td className="px-5 py-3">
+                    {c.worker?.user?.name || c.worker?.user?.email || c.worker?._id?.toString().slice(0, 8) || '—'}
+                  </td>
+                  <td className="px-5 py-3 text-gray-500">
+                    {c.booking ? `${c.booking.bookingNumber}${c.booking.serviceSnapshot?.name ? ` • ${c.booking.serviceSnapshot.name}` : ''}` : '—'}
+                  </td>
+                  <td className="px-5 py-3 text-gray-500">{new Date(c.createdAt || c.updatedAt).toLocaleString()}</td>
+                  <td className="px-5 py-3 text-right font-bold text-violet-700">{inr(c.amount)}</td>
                 </tr>
               ))}
             </tbody>

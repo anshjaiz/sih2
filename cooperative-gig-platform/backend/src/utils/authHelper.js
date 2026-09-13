@@ -26,13 +26,12 @@ const sanitizeUser = (user) => {
     avatar: user.avatar || '',
     languages: user.languages || [],
     isActive: user.isActive,
-    isEmailVerified: user.isEmailVerified,
     createdAt: user.createdAt,
   };
 };
 
-// Generate a random OTP (for password reset)
-const generateOTP = () => {
+// Generate a random reset token (for password reset)
+const generateResetToken = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
@@ -42,4 +41,4 @@ const generateRef = (prefix) => {
   return `${prefix}-${Date.now()}-${random}`;
 };
 
-module.exports = { generateToken, sanitizeUser, generateOTP, generateRef };
+module.exports = { generateToken, sanitizeUser, generateResetToken, generateRef };

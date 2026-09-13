@@ -633,6 +633,32 @@ const applyCancellation = async ({
     ).catch((e) => console.error('[cancellation] balance update error:', e.message));
   }
 
+  // ── Worker travel compensation: credit IMMEDIATELY so the worker's wallet
+  //     reflects the money now, instead of waiting for the (possibly never
+  //     arriving) next paid booking. creditCompensation is idempotent by
+  //     reference (COMP-<cancellationId>); if this credit fails, the ledger
+  //     stays PENDING and settleCarriedCancellationBalance remains the fallback.
+  if (outcome.workerCompensationAmount > 0 && booking.worker && cancellation) {
+    try {
+      const { creditCompensation } = require('../wallet/walletService');
+      const res = await creditCompensation({
+        workerId: booking.worker,
+        amount: outcome.workerCompensationAmount,
+        bookingId: booking._id,
+        reference: `COMP-${cancellation._id}`,
+      });
+      if (res && res.created) {
+        outcome.compensationCredited = true;
+        await Cancellation.updateOne(
+          { _id: cancellation._id },
+          { $set: { compensationStatus: 'PAID', compensationSettled: true } }
+        );
+      }
+    } catch (e) {
+      console.error('[cancellation] immediate compensation credit error:', e.message);
+    }
+  }
+
   // ── Merchant / merit effects ──
   if (outcome.workerMeritPoints !== 0 && booking.worker) {
     try {
@@ -766,7 +792,9 @@ const notifyCancellation = async ({ booking, outcome, cancelledBy }) => {
           title: 'Customer cancelled',
           message: `The customer cancelled ${booking.bookingNumber}.${
             outcome.workerCompensationAmount > 0
-              ? ` You are eligible for ₹${outcome.workerCompensationAmount} travel compensation (recorded for settlement).`
+              ? outcome.compensationCredited
+                ? ` ₹${outcome.workerCompensationAmount} travel compensation was credited to your wallet.`
+                : ` You are eligible for ₹${outcome.workerCompensationAmount} travel compensation (recorded for settlement).`
               : ''
           }`,
           data: { bookingId: booking._id, compensation: outcome.workerCompensationAmount },
