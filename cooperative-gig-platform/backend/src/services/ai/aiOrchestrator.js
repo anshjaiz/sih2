@@ -15,13 +15,13 @@ const env = require('../../config/env');
 const { toolDeclarations, toolHandlers } = require('./geminiDataTools');
 const { createGeminiAdapter, createOpenAICompatibleAdapter } = require('./aiAdapters');
 
-const MAX_TOOL_ROUNDS = 4;
+const MAX_TOOL_ROUNDS = env.aiMaxToolRounds || 3;
 
 function buildProviderRegistry() {
   return {
-    gemini: () => createGeminiAdapter({ apiKey: env.geminiApiKey, model: env.geminiModel || 'gemini-3.6-flash' }),
-    groq: () => createOpenAICompatibleAdapter({ name: 'groq', apiKey: env.groqApiKey, model: env.groqModel || 'openai/gpt-oss-20b', baseUrl: 'https://api.groq.com/openai/v1' }),
-    xai: () => createOpenAICompatibleAdapter({ name: 'xai', apiKey: env.xaiApiKey, model: env.xaiModel || 'grok-2-latest', baseUrl: 'https://api.x.ai/v1' }),
+    gemini: () => createGeminiAdapter({ apiKey: env.geminiApiKey, model: env.geminiModel || 'gemini-3.6-flash', maxOutputTokens: env.aiMaxOutputTokens }),
+    groq: () => createOpenAICompatibleAdapter({ name: 'groq', apiKey: env.groqApiKey, model: env.groqModel || 'openai/gpt-oss-20b', baseUrl: 'https://api.groq.com/openai/v1', maxOutputTokens: env.aiMaxOutputTokens }),
+    xai: () => createOpenAICompatibleAdapter({ name: 'xai', apiKey: env.xaiApiKey, model: env.xaiModel || 'grok-2-latest', baseUrl: 'https://api.x.ai/v1', maxOutputTokens: env.aiMaxOutputTokens }),
   };
 }
 
@@ -127,6 +127,8 @@ async function chatWithFallback({ systemPrompt, history, message, workerId, tool
   }
 
   let lastKind = 'HTTP';
+  let lastProvider = 'unknown';
+  let lastMessage = '';
   for (const adapter of adapters) {
     try {
       return await runWithProvider(adapter, {
@@ -139,7 +141,9 @@ async function chatWithFallback({ systemPrompt, history, message, workerId, tool
       });
     } catch (err) {
       lastKind = err?.kind || lastKind;
-      console.error(`[AI Assistant] Provider "${adapter.name}" failed (${lastKind}):`, err.message);
+      lastProvider = adapter.name;
+      lastMessage = err?.message || String(err);
+      console.error(`[AI Assistant] Provider "${adapter.name}" failed (${lastKind}):`, lastMessage);
       // Failure → continue to the next configured provider only.
     }
   }
@@ -147,6 +151,8 @@ async function chatWithFallback({ systemPrompt, history, message, workerId, tool
   const failed = new Error(`All AI providers failed (last: ${lastKind})`);
   failed.code = 'ALL_PROVIDERS_FAILED';
   failed.kind = lastKind;
+  failed.provider = lastProvider;
+  failed.providerError = lastMessage;
   throw failed;
 }
 

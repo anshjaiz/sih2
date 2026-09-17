@@ -29,7 +29,7 @@ const {
   approveMaterialRequest,
   rejectMaterialRequest,
 } = require('../controllers/shared/materialRequestController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 const { upload } = require('../middleware/uploadMiddleware');
 const { chatHandler } = require('../controllers/ai/assistantController');
 const rateLimit = require('express-rate-limit');
@@ -44,35 +44,35 @@ const aiChatLimiter = rateLimit({
 });
 
 // Dashboard (authenticated customer)
-router.get('/dashboard', protect, getDashboard);
+router.get('/dashboard', protect, authorize('customer'), getDashboard);
 
 // AI Home & Service Assistant (chatbot)
 router.post('/ai-assistant/chat', protect, aiChatLimiter, chatHandler);
 
 // Profile
-router.get('/profile', protect, getCustomerProfile);
-router.put('/profile', protect, updateCustomerProfile);
+router.get('/profile', protect, authorize('customer'), getCustomerProfile);
+router.put('/profile', protect, authorize('customer'), updateCustomerProfile);
 
 // Cancellation history (profile / suspension screen)
-router.get('/cancellations', protect, getCustomerCancellations);
+router.get('/cancellations', protect, authorize('customer'), getCustomerCancellations);
 
 // Bookings
-router.get('/bookings', protect, getBookings);
-router.post('/bookings', protect, upload.array('images', 5), createServiceRequest);
-router.get('/bookings/:id', protect, getBookingById);
-router.put('/bookings/:id/cancel', protect, cancelBooking);
-router.post('/bookings/:id/cancel-preview', protect, previewCancellation);
-router.post('/bookings/:id/reassign', protect, requestReassignment);
-router.post('/bookings/:id/confirm', protect, confirmCompletion);
-router.post('/bookings/:id/material-request/:requestId/approve', protect, approveMaterialRequest);
-router.post('/bookings/:id/material-request/:requestId/reject', protect, rejectMaterialRequest);
+router.get('/bookings', protect, authorize('customer'), getBookings);
+router.post('/bookings', protect, authorize('customer'), upload.array('images', 5), createServiceRequest);
+router.get('/bookings/:id', protect, authorize('customer'), getBookingById);
+router.put('/bookings/:id/cancel', protect, authorize('customer'), cancelBooking);
+router.post('/bookings/:id/cancel-preview', protect, authorize('customer'), previewCancellation);
+router.post('/bookings/:id/reassign', protect, authorize('customer'), requestReassignment);
+router.post('/bookings/:id/confirm', protect, authorize('customer'), confirmCompletion);
+router.post('/bookings/:id/material-request/:requestId/approve', protect, authorize('customer'), approveMaterialRequest);
+router.post('/bookings/:id/material-request/:requestId/reject', protect, authorize('customer'), rejectMaterialRequest);
 
 // Payments
-router.post('/payments', protect, initiatePayment);
-router.get('/payments/booking/:bookingId', protect, getPaymentForBooking);
+router.post('/payments', protect, authorize('customer'), initiatePayment);
+router.get('/payments/booking/:bookingId', protect, authorize('customer'), getPaymentForBooking);
 
 // Invoices
-router.get('/invoices', protect, getCustomerInvoices);
-router.get('/invoices/booking/:bookingId', protect, getInvoiceByBooking);
+router.get('/invoices', protect, authorize('customer'), getCustomerInvoices);
+router.get('/invoices/booking/:bookingId', protect, authorize('customer'), getInvoiceByBooking);
 
 module.exports = router;

@@ -46,7 +46,7 @@ function toOpenAIFormattedTools(declarations) {
 
 /* ─────────────── Gemini adapter (uses @google/generative-ai SDK) ─────────────── */
 
-function createGeminiAdapter({ apiKey, model }) {
+function createGeminiAdapter({ apiKey, model, maxOutputTokens = 1024 }) {
   const resolvedModel = model || 'gemini-3.6-flash';
   let genModel = null;
 
@@ -87,7 +87,7 @@ function createGeminiAdapter({ apiKey, model }) {
       if (!genModel) {
         genModel = new GoogleGenerativeAI(apiKey).getGenerativeModel({
           model: resolvedModel,
-          generationConfig: { temperature: 0.7, topP: 0.9, topK: 40, maxOutputTokens: 2048 },
+          generationConfig: { temperature: 0.7, topP: 0.9, topK: 40, maxOutputTokens },
         });
       }
 
@@ -138,7 +138,7 @@ function createGeminiAdapter({ apiKey, model }) {
 
 /* ─────────────── OpenAI-compatible adapter (Groq, xAI, OpenAI via fetch) ─────────────── */
 
-function createOpenAICompatibleAdapter({ name, apiKey, baseUrl, model }) {
+function createOpenAICompatibleAdapter({ name, apiKey, baseUrl, model, maxOutputTokens = 1024 }) {
   const resolvedModel = model || 'gpt-4o-mini';
   const isConfigured = () => Boolean(apiKey);
 
@@ -193,7 +193,7 @@ function createOpenAICompatibleAdapter({ name, apiKey, baseUrl, model }) {
       model: resolvedModel,
       messages: toOpenAIMessages([{ role: 'system', content: systemPrompt }, ...messages]),
       temperature: 0.7,
-      max_tokens: 2048,
+      max_tokens: maxOutputTokens,
     };
     if (tools && tools.length > 0) {
       body.tools = toOpenAIFormattedTools(tools);

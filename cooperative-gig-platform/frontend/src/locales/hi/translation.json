@@ -109,7 +109,9 @@
     "recalculating": "मार्ग पुनः गणना हो रही है…",
     "distance": "दूरी",
     "eta": "अनुमानित समय",
-    "calculating": "दूरी और अनुमानित समय की गणना हो रही है…"
+    "calculating": "दूरी और अनुमानित समय की गणना हो रही है…",
+    "worker": "कार्यकर्ता",
+    "admin": "सहकारी प्रशासक"
   },
   "auth": {
     "signIn": "साइन इन करें",
@@ -151,7 +153,23 @@
     "resetting": "रीसेट हो रहा है…",
     "resetSuccess": "पासवर्ड सफलतापूर्वक रीसेट हो गया!",
     "goToLogin": "लॉगिन पर जाएं",
-    "checkEmailOrConsole": "अपना ईमेल जांचें (या डेमो के लिए डेव कंसोल)"
+    "checkEmailOrConsole": "अपना ईमेल जांचें (या डेमो के लिए डेव कंसोल)",
+    "customerRoleTitle": "ग्राहक साइन इन",
+    "workerRoleTitle": "कार्यकर्ता साइन इन",
+    "adminRoleTitle": "प्रशासक साइन इन",
+    "customerRoleSub": "अपने घर और समुदाय के लिए भरोसेमंद सेवाएँ बुक करें।",
+    "workerRoleSub": "काम खोजें, अपने समुदाय की सेवा करें और ShramikSetu के साथ आगे बढ़ें।",
+    "adminRoleSub": "ShramikSetu प्लेटफ़ॉर्म का प्रबंधन और निगरानी करें।",
+    "customerLoginLink": "ग्राहक साइन इन",
+    "workerLoginLink": "कार्यकर्ता साइन इन",
+    "adminLoginLink": "प्रशासक साइन इन",
+    "notThisRole": "गलत भूमिका?",
+    "wrongRole": "यह खाता {role} के रूप में साइन इन है। कृपया {role} साइन-इन पेज का उपयोग करें।",
+    "roleMismatch": "यह खाता {role} नहीं है। कृपया {role} साइन-इन पृष्ठ का उपयोग करें।",
+    "backToRoleSelect": "भूमिका चयन पर वापस जाएँ",
+    "requiredFields": "कृपया सभी आवश्यक फ़ील्ड भरें।",
+    "loginSuccess": "सफलतापूर्वक साइन इन किया गया",
+    "loginFailed": "अमान्य ईमेल या पासवर्ड।"
   },
   "cats": {
     "all": "सभी",

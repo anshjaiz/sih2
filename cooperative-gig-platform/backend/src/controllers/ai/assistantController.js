@@ -67,6 +67,9 @@ const chatHandler = asyncHandler(async (req, res) => {
       actions: response.actions || [],
       diagnosis: response.diagnosis || null,
       errorCode: response.errorCode || null,
+      errorKind: response.errorKind || null,
+      retryable: Boolean(response.retryable),
+      lastProvider: response.lastProvider || null,
     },
   });
 });

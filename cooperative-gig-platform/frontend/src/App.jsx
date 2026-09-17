@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Auth pages
 import Login from './pages/auth/Login';
+import RoleLogin from './pages/auth/RoleLogin';
 import Register from './pages/auth/Register';
 import ForgotPassword from './pages/auth/ForgotPassword';
 
@@ -90,6 +91,9 @@ export default function App() {
 
           {/* Public routes */}
           <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/customer/login" element={<PublicRoute><RoleLogin mode="customer" /></PublicRoute>} />
+          <Route path="/worker/login" element={<PublicRoute><RoleLogin mode="worker" /></PublicRoute>} />
+          <Route path="/admin/login" element={<PublicRoute><RoleLogin mode="admin" /></PublicRoute>} />
           <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
           <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
 

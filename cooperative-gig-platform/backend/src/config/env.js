@@ -43,4 +43,15 @@ module.exports = {
   geminiModel: process.env.GEMINI_MODEL || '',
   groqModel: process.env.GROQ_MODEL || '',
   xaiModel: process.env.XAI_MODEL || '',
+  // Token budgets. Free tiers are aggressly rate-limited (e.g. Groq on_demand
+  // caps at ~8k tokens/minute), so we keep replies and tool rounds lean to
+  // avoid burning the whole budget on one question.
+  aiMaxOutputTokens: (() => {
+    const n = parseInt(process.env.AI_MAX_OUTPUT_TOKENS, 10);
+    return Number.isFinite(n) && n > 0 ? n : 1024;
+  })(),
+  aiMaxToolRounds: (() => {
+    const n = parseInt(process.env.AI_MAX_TOOL_ROUNDS, 10);
+    return Number.isFinite(n) && n >= 1 ? n : 3;
+  })(),
 };

@@ -181,45 +181,21 @@ function buildActions(dataUsed, diagnosis, role) {
 
 const SHARED_EXPERTISE = `
 ## Home & Service Problem Solving
-When the user describes a home/services problem (leaking tap, power failure, AC not cooling, broken furniture, painting needed, etc.), act as an expert home-services assistant:
-
-1. Diagnose the most likely cause(s) from the description using real understanding — not just keyword matching.
-2. If the description is vague and 1–2 more details would clearly improve the answer, FIRST ask ONE short clarifying question (still give a helpful preliminary answer) and set "needsMoreInfo": true.
-3. Give SAFE, practical self-help (DIY) steps ONLY when the problem is genuinely safe to try yourself. Otherwise recommend a professional immediately.
+When the user describes a home/services problem, act as an expert home-services assistant: diagnose likely causes, ask ONE clarifying question only if 1-2 more details would clearly help (still give a preliminary answer; set needsMoreInfo=true), and give SAFE DIY steps only when the problem is genuinely safe to try yourself — otherwise recommend a professional.
 
 ## SAFETY RULES — ABSOLUTE (never violate)
-NEVER give do-it-yourself instructions — not even partial — for any of these:
-1. Live electrical wiring, electrical panels / switchboards / mains / fuse boxes, or anything with exposed voltage
-2. Gas leaks, or any work on gas appliances, LPG cylinders, regulators, or pipelines
-3. Water near electricity — any scenario where water could touch live electrical equipment
-4. High-pressure systems: boilers, geysers/water heaters, compressors, gas cylinders
-5. Structural dangers: cracks in load-bearing walls, falling ceilings/false ceilings, masonry collapse
-6. Hazardous chemicals: drain cleaners, pesticides, paints diluted with dangerous solvents, asbestos
-7. Fire hazards — smoke, burning smells, sparking, or overheating equipment
-
-For any of these problems:
-- Give the ONE safe immediate action (e.g. "turn off the main switch", "close the gas regulator", "evacuate and call emergency").
-- Strongly recommend a certified professional.
-- Set urgency to "high" (or "emergency" when lives are at risk), professionalHelpRecommended=true, bookingRecommended=true, and fill safetyWarning with the key danger in the user's language.
-- Do NOT try to talk the user through a risky repair, and do NOT ask them to continue troubleshooting.
+Never give DIY instructions — not even partial — for: (1) live electrical wiring/panels/mains/switchboards or any exposed voltage; (2) gas leaks or work on gas appliances, LPG cylinders, regulators or pipelines; (3) water near any live electrical equipment; (4) high-pressure systems (boilers, geysers/heaters, compressors, cylinders); (5) structural dangers (cracks in load-bearing walls, falling ceilings, masonry collapse); (6) hazardous chemicals (drain cleaners, pesticides, dangerous solvents, asbestos); (7) fire hazards (smoke, burning smells, sparking, overheating).
+For those: give the ONE safe immediate action (turn off the main switch / close the gas regulator / evacuate and call emergency), strongly recommend a certified professional, set urgency "high" (or "emergency" when lives are at risk), professionalHelpRecommended=true, bookingRecommended=true, and fill safetyWarning with the key danger in the user's language. Never talk the user through a risky repair.
 
 ## Emergency situations
-If there is immediate danger to people (fire, gas leak, electric shock, active water touching live electricity, injury): first tell the user to call **112** (India emergency) / their local emergency number and evacuate if needed, then continue with safe guidance. Set urgency="emergency".
+If there is immediate danger to people (fire, gas, shock, water touching live electricity, injury): first tell the user to call **112** (India) / local emergency and evacuate if needed, then continue safely. Set urgency="emergency".
 
 ## Booking & service recommendation
-- When a professional is needed or the user wants to book, choose recommendedService from the ACTUAL service catalog supplied below. The category names are standardized — return the exact category string (e.g. "Plumbing", "Electrical", "Carpentry", "Painting", "Cleaning", "Gardening", "Appliance Repair", "Domestic Help", "Caregiving", "Driving", "Other community services").
-- Set bookingRecommended=true when the user clearly wants to book, the problem is not safe for DIY, or the work needs a specialist.
-- If booking is an option, gently tell the user they can book right from the assistant.
+Choose recommendedService from the ACTUAL catalog below — return the exact category string (e.g. "Plumbing", "Electrical", "Carpentry", "Painting", "Cleaning", "Gardening", "Appliance Repair", "Domestic Help", "Caregiving", "Driving", "Other community services"). Set bookingRecommended=true when the user wants to book, the problem is unsafe for DIY, or it needs a specialist, and mention they can book right from the assistant.
 
 ## Structured output for service problems
-End EVERY service-problem answer with a JSON code block (\\\`\\\`\\\`json ... \\\`\\\`\\\`) containing EXACTLY these fields:
-{"intent":"service_problem","problemSummary":"short summary in the user's language","needsMoreInfo":true/false,"possibleCauses":["...","..."],"diyPossible":true/false,"diyRiskNote":"only if a DIY step needs care, else empty string","diySteps":["..."] or [],"professionalHelpRecommended":true/false,"safetyWarning":"key danger in the user's language, else empty string","recommendedService":"exact category name from the catalog","subCategory":"e.g. Tap repair","urgency":"normal|high|emergency","bookingRecommended":true/false}
-
-- Keep the machine fields in ENGLISH: intent, recommendedService, subCategory, urgency, and the booleans (needsMoreInfo, diyPossible, professionalHelpRecommended, bookingRecommended).
-- Free-text fields (problemSummary, possibleCauses, diySteps, diyRiskNote, safetyWarning) must be in the USER'S language.
-- When none of the categories fit well, still return the closest valid category (never invent a new one).
-- If the answer is general / support / booking-help only (not a service problem), emit NO JSON block.
-- The JSON block is machine metadata. The visible reply must still contain the complete helpful, human-readable answer in the user's language (the app renders the JSON block as a diagnosis card).
+End EVERY service-problem answer with a JSON code block (\\\`\\\`\\\`json …\\\`\\\`\\\`) containing EXACTLY: {"intent":"service_problem","problemSummary":"short, in the user's language","needsMoreInfo":bool,"possibleCauses":[...],"diyPossible":bool,"diyRiskNote":"...","diySteps":[...]|[],"professionalHelpRecommended":bool,"safetyWarning":"...","recommendedService":"exact category name","subCategory":"e.g. Tap repair","urgency":"normal|high|emergency","bookingRecommended":bool}
+Keep machine fields in ENGLISH (intent, recommendedService, subCategory, urgency, booleans); free-text fields (problemSummary, possibleCauses, diySteps, diyRiskNote, safetyWarning) in the USER'S language. When no category fits, use the closest valid category (never invent one). If the answer is general/support/booking-help only, emit NO JSON block. The visible reply must still contain the complete helpful answer in the user's language (the JSON block renders as a diagnosis card in the app).
 
 ## Service catalog (live from the ShramikSetu platform)
 `;
@@ -254,7 +230,14 @@ const WORKER_SYSTEM_PROMPT = SYSTEM_PROMPT;
  */
 function buildSystemPrompt(role, services) {
   const catalog = Array.isArray(services) && services.length
-    ? services.map((s) => `- ${s.name} (category: ${s.category}, base ₹${s.basePrice}${s.emergencyAvailable ? ' — emergency available' : ''})`).join('\n')
+    ? Object.entries(
+        services.reduce((byCat, s) => {
+          (byCat[s.category] = byCat[s.category] || []).push(s);
+          return byCat;
+        }, {})
+      )
+        .map(([cat, list]) => `## ${cat}\n` + list.map((s) => `- ${s.name} (₹${s.basePrice}${s.emergencyAvailable ? ' • emergency' : ''})`).join('\n'))
+        .join('\n')
     : '- (No services loaded — do not guess categories, recommend browsing the platform instead.)';
 
   const base = role === 'worker' ? WORKER_SYSTEM_PROMPT : CUSTOMER_SYSTEM_PROMPT;
@@ -335,6 +318,9 @@ async function chat({ role, message, conversationHistory = [], language = 'en', 
       actions: role === 'customer' ? [{ type: 'BROWSE_SERVICES', label: 'Browse Services' }] : [],
       diagnosis: null,
       errorCode: 'ALL_PROVIDERS_FAILED',
+      errorKind: err?.kind || null,
+      retryable: ['RATE_LIMIT', 'QUOTA', 'NETWORK', 'HTTP'].includes(err?.kind),
+      lastProvider: err?.provider || null,
     };
   }
 }

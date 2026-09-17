@@ -109,7 +109,9 @@
     "recalculating": "Recalculating route…",
     "distance": "Distance",
     "eta": "ETA",
-    "calculating": "Calculating distance & ETA…"
+    "calculating": "Calculating distance & ETA…",
+    "worker": "Worker",
+    "admin": "Cooperative Admin"
   },
   "auth": {
     "signIn": "Sign in",
@@ -151,7 +153,23 @@
     "resetting": "Resetting…",
     "resetSuccess": "Password reset successful!",
     "goToLogin": "Go to Login",
-    "checkEmailOrConsole": "Check your email (or dev console for demo)"
+    "checkEmailOrConsole": "Check your email (or dev console for demo)",
+    "customerRoleTitle": "Customer Sign In",
+    "workerRoleTitle": "Worker Sign In",
+    "adminRoleTitle": "Admin Sign In",
+    "customerRoleSub": "Book trusted services for your home and community.",
+    "workerRoleSub": "Find work, serve your community, and grow with ShramikSetu.",
+    "adminRoleSub": "Manage and monitor the ShramikSetu platform.",
+    "customerLoginLink": "Customer Sign In",
+    "workerLoginLink": "Worker Sign In",
+    "adminLoginLink": "Admin Sign In",
+    "notThisRole": "Wrong role?",
+    "wrongRole": "This account is signed in as {role}. Please use the {role} sign-in page.",
+    "roleMismatch": "This account is not a {role}. Please use the {role} sign-in page.",
+    "backToRoleSelect": "Back to role selection",
+    "requiredFields": "Please fill in all required fields.",
+    "loginSuccess": "Signed in successfully",
+    "loginFailed": "Invalid email or password."
   },
   "cats": {
     "all": "All",

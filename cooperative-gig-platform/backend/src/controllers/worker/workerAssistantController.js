@@ -32,6 +32,11 @@ const chatHandler = asyncHandler(async (req, res) => {
       reply: response.reply,
       dataUsed: response.dataUsed || [],
       actions: response.actions || [],
+      // Optional error context so the UI can offer a "Retry in a minute"
+      // button instead of showing a dead generic unavailability message.
+      errorKind: response.errorKind || null,
+      retryable: Boolean(response.retryable),
+      lastProvider: response.lastProvider || null,
     },
   });
 });

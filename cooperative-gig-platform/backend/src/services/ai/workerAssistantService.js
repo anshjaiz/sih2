@@ -162,6 +162,19 @@ async function chat(workerId, message, conversationHistory = [], language = 'en'
         actions: [],
       };
     }
+
+    // ALL_PROVIDERS_FAILED — every configured provider failed. err.kind tells
+    // us WHY (QUOTA / RATE_LIMIT / NETWORK / CONFIG / HTTP) so the UI can offer
+    // a "wait and retry" action instead of an unhelpful dead generic message.
+    const kind = err?.kind || (err.code === 'ALL_PROVIDERS_FAILED' ? 'HTTP' : undefined);
+    const retryable = ['QUOTA', 'RATE_LIMIT', 'NETWORK', 'HTTP'].includes(kind);
+    if (err.code === 'ALL_PROVIDERS_FAILED') {
+      const reply = retryable
+        ? 'The AI provider is temporarily rate-limited. Please wait about a minute and try again — your request was not lost.'
+        : 'AI Assistant is temporarily unavailable. Please try again shortly.';
+      return { reply, dataUsed: [], actions: [], errorKind: kind, retryable };
+    }
+
     console.error('[AI Assistant] All providers failed:', err.message);
     return {
       reply: 'AI Assistant is temporarily unavailable. Please try again shortly.',
