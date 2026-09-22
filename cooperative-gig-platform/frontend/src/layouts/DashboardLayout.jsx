@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import LanguageSelector from '../components/LanguageSelector';
-import { HiOutlineBell } from 'react-icons/hi';
+import NotificationBell from '../components/NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 
@@ -31,10 +31,7 @@ export default function DashboardLayout({ role }) {
           </div>
           <div className="flex items-center gap-3">
             <LanguageSelector compact />
-            <button className="relative p-2 text-gray-500 hover:text-gray-700">
-              <HiOutlineBell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationBell />
             <div className="text-sm text-gray-700 hidden sm:block">
               <span className="font-semibold text-[#35443a]">{user?.name}</span>
               <span className="text-gray-400 ml-2 text-xs">({user?.role})</span>

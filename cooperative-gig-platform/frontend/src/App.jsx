@@ -17,9 +17,11 @@ import AdminLayout from './layouts/AdminLayout';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import Services from './pages/customer/Services';
 import CreateRequest from './pages/customer/CreateRequest';
+import MyComplaints from './pages/customer/MyComplaints';
 import MyBookings from './pages/customer/MyBookings';
 import BookingDetails from './pages/customer/BookingDetails';
-import MyComplaints from './pages/customer/MyComplaints';
+import Notifications from './pages/Notifications';
+import { NotificationProvider } from './context/NotificationContext';
 import Profile from './pages/customer/Profile';
 import PaymentHistory from './pages/customer/PaymentHistory';
 
@@ -84,7 +86,8 @@ function Landing() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <NotificationProvider>
+        <BrowserRouter>
         <Toaster position="top-right" duration={3000} />
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -107,6 +110,7 @@ export default function App() {
             <Route path="bookings/:id" element={<BookingDetails />} />
             <Route path="payments" element={<PaymentHistory />} />
             <Route path="complaints" element={<MyComplaints />} />
+            <Route path="notifications" element={<Notifications />} />
             <Route path="profile" element={<Profile />} />
           </Route>
 
@@ -121,6 +125,7 @@ export default function App() {
             <Route path="welfare" element={<Welfare />} />
             <Route path="collaborations" element={<Collaborations />} />
             <Route path="complaints" element={<WorkerComplaints />} />
+            <Route path="notifications" element={<Notifications />} />
           </Route>
 
           {/* Admin routes */}
@@ -129,6 +134,7 @@ export default function App() {
             <Route path="workers" element={<AdminWorkers />} />
             <Route path="bookings" element={<AdminBookings />} />
             <Route path="complaints" element={<AdminComplaints />} />
+            <Route path="notifications" element={<Notifications />} />
             <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="demand" element={<AdminDemand />} />
             <Route path="forecast" element={<AdminForecast />} />
@@ -141,7 +147,8 @@ export default function App() {
 
           <Route path="*" element={<div className="flex flex-col items-center justify-center h-screen"><h1 className="text-4xl font-bold text-gray-300">404</h1><p className="text-gray-500">Page not found</p></div>} />
         </Routes>
-      </BrowserRouter>
+        </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

@@ -1086,5 +1086,19 @@
     "unsuspendPromptFor": "आप निलंबन समाप्त कर रहे हैं:",
     "unsuspendReasonPlaceholder": "कारण (उपयोगकर्ता को दिखाया जाएगा)…",
     "confirmUnsuspend": "निलंबन समाप्ति की पुष्टि करें"
+  },
+  "notif": {
+    "bell": "Notifications",
+    "title": "Notifications",
+    "delete": "Delete",
+    "empty": "No notifications yet",
+    "error": "Could not load notifications",
+    "loading": "Loading...",
+    "markAllRead": "Mark all read",
+    "next": "Next",
+    "page": "Page {{n}} of {{of}}",
+    "prev": "Prev",
+    "read": "Mark read",
+    "viewAll": "View all"
   }
 }

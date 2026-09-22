@@ -1068,5 +1068,19 @@
     "unsuspendPromptFor": "Aap unsuspend kar rahe ho:",
     "unsuspendReasonPlaceholder": "Reason (user ko dikhega)…",
     "confirmUnsuspend": "Unsuspend confirm karo"
+  },
+  "notif": {
+    "bell": "Notifications",
+    "title": "Notifications",
+    "delete": "Delete",
+    "empty": "No notifications yet",
+    "error": "Could not load notifications",
+    "loading": "Loading...",
+    "markAllRead": "Mark all read",
+    "next": "Next",
+    "page": "Page {{n}} of {{of}}",
+    "prev": "Prev",
+    "read": "Mark read",
+    "viewAll": "View all"
   }
 }
