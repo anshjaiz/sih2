@@ -6,6 +6,7 @@ const WorkerAvailability = require('../../models/WorkerAvailability');
 const { asyncHandler, ApiError } = require('../../middleware/errorMiddleware');
 const {
   findCollaboratorCandidates,
+  evaluateWorkerForRequest,
 } = require('../../services/collaborator/collaboratorMatchingService');
 const teamFormationService = require('../../services/collaborator/teamFormationService');
 const {
@@ -155,7 +156,8 @@ const getMyCollaborationRequests = asyncHandler(async (req, res) => {
   const workerId = await getWorkerId(req.user._id);
   if (!workerId) return res.json({ success: true, data: [] });
 
-  const requests = await CollaborationRequest.find({
+  // Requests the worker was invited into by matching at create-time.
+  const invited = await CollaborationRequest.find({
     'candidates.worker': workerId,
     status: { $in: ['OPEN'] },
   })
@@ -164,15 +166,42 @@ const getMyCollaborationRequests = asyncHandler(async (req, res) => {
     .populate('candidates.worker', 'user rating ratingCount collaborationsCount')
     .sort({ createdAt: -1 });
 
+  // PLUS any OPEN request near this worker that they are eligible for, even
+  // when the lead's original candidate snapshot missed them (e.g. 0-candidate
+  // requests). Eligibility uses the exact same role/skill/location rules as
+  // candidate matching so no invisible collaboration requests remain.
+  const worker = await Worker.findById(workerId);
+  const nearbyOpen = await CollaborationRequest.find({
+    status: 'OPEN',
+    leadWorker: { $ne: workerId },
+    'candidates.worker': { $ne: workerId },
+  })
+    .populate('booking')
+    .populate(populateUser('leadWorker'))
+    .populate('candidates.worker', 'user rating ratingCount collaborationsCount')
+    .sort({ createdAt: -1 });
+
+  const merged = [...invited];
+  const evalByRequest = new Map();
+  for (const r of nearbyOpen) {
+    if (invited.some((i) => i._id.toString() === r._id.toString())) continue;
+    const evalResult = await evaluateWorkerForRequest(worker, r);
+    if (evalResult.eligible) {
+      merged.push(r);
+      evalByRequest.set(r._id.toString(), evalResult);
+    }
+  }
+
   const enriched = await Promise.all(
-    requests.map(async (r) => {
+    merged.map(async (r) => {
       const mySlot = (r.candidates || []).find((c) => c.worker._id.toString() === workerId.toString());
+      const evalResult = evalByRequest.get(r._id.toString());
       const lead = await Worker.findById(r.leadWorker ? r.leadWorker._id : null).populate('user', 'name email phone');
       return {
         ...r.toObject(),
         myStatus: mySlot ? mySlot.status : null,
-        myScore: mySlot ? mySlot.score : null,
-        myReasons: mySlot ? mySlot.reasons : [],
+        myScore: mySlot ? mySlot.score : evalResult ? evalResult.score : null,
+        myReasons: mySlot ? mySlot.reasons : evalResult ? evalResult.reasons : [],
         lead: lead,
       };
     })

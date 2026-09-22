@@ -31,3 +31,5 @@ logs/
 
 # Coverage
 coverage/
+
+mongo_dump/

@@ -46,6 +46,11 @@ const slotStateOf = async (request) => {
 
 /**
  * Candidate worker accepts a collaboration invitation.
+ *
+ * A worker who discovers an OPEN request through the Opportunities feed (and is
+ * verified + nearby + role/skill eligible) can join even if the lead's original
+ * candidate snapshot missed them — they are added to the candidate list on the
+ * fly with their computed match score.
  */
 const acceptCollaborator = async (requestId, workerId) => {
   const request = await CollaborationRequest.findById(requestId);
@@ -56,9 +61,26 @@ const acceptCollaborator = async (requestId, workerId) => {
   const slot = request.candidates.find(
     (c) => c.worker.toString() === workerId.toString() && c.status === 'PENDING'
   );
+
   if (!slot) {
-    return { ok: false, error: 'You were not invited to this collaboration' };
+    const worker = await Worker.findById(workerId);
+    const evalResult = await require('./collaboratorMatchingService').evaluateWorkerForRequest(worker, request);
+    if (!evalResult.eligible) {
+      return { ok: false, error: 'You were not invited to this collaboration' };
+    }
+    request.candidates.push({
+      worker: workerId,
+      score: evalResult.score || 0,
+      reasons: evalResult.reasons || [],
+      status: 'PENDING',
+    });
+    await request.save();
   }
+
+  const currentSlot = request.candidates.find(
+    (c) => c.worker.toString() === workerId.toString() && c.status === 'PENDING'
+  );
+  if (!currentSlot) return { ok: false, error: 'You were not invited to this collaboration' };
 
   // Guard against double-accept while another request is in flight
   const already = request.candidates.find(
@@ -68,8 +90,8 @@ const acceptCollaborator = async (requestId, workerId) => {
 
   const { full } = await slotStateOf(request);
 
-  slot.status = 'ACCEPTED';
-  slot.respondedAt = new Date();
+  currentSlot.status = 'ACCEPTED';
+  currentSlot.respondedAt = new Date();
 
   // Enroll as a team member
   await ensureTeam({
