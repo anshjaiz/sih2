@@ -727,6 +727,17 @@ const applyCancellation = async ({
     });
   }
 
+  // ── Collaboration cleanup ────────────────────────────────────────────
+  // A cancelled booking must never keep surfacing in the collaboration feeds
+  // or active team views. Close any OPEN/FILLED collaboration requests and drop
+  // the team so no stale helper invitations remain.
+  try {
+    await require('../collaborator/teamFormationService')
+      .closeCollaborationForBooking(booking._id, { status: 'CANCELLED' });
+  } catch (e) {
+    console.error('[cancellation] collaboration cleanup error:', e.message);
+  }
+
   // ── Notifications ──
   await notifyCancellation({ booking, outcome, cancelledBy, actorId }).catch(() => {});
 

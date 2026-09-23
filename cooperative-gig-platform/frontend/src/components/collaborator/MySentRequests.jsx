@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import { getSocket } from '../../services/socket';
 import api from '../../services/api';
+import { cancelCollaborationRequest } from '../../services/collaboratorService';
 
 const fmtDate = (d) => {
   if (!d) return '';
@@ -28,6 +30,7 @@ export default function MySentRequests() {
   const { t } = useTranslation();
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState(null);
 
   const load = async () => {
     try {
@@ -37,6 +40,20 @@ export default function MySentRequests() {
       console.error(e);
     }
     setLoading(false);
+  };
+
+  const handleCancel = async (id) => {
+    if (!window.confirm(t('collab.cancelConfirm', 'Cancel this collaboration request?'))) return;
+    setCancellingId(id);
+    try {
+      const res = await cancelCollaborationRequest(id);
+      toast.success(res?.data?.message || t('collab.cancelSuccessMsg', 'Collaboration request cancelled'));
+      await load();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || t('collab.cancelFailedMsg', 'Could not cancel the request'));
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   useEffect(() => {
@@ -71,6 +88,15 @@ export default function MySentRequests() {
                 <p className="text-sm text-gray-500">{booking.bookingNumber} · {r._id.toString().slice(-6)}</p>
               </div>
               <div className="flex items-center gap-2">
+                {r.status === 'OPEN' && (
+                  <button
+                    onClick={() => handleCancel(r._id)}
+                    disabled={cancellingId === r._id}
+                    className="btn-secondary text-xs px-3 py-1"
+                  >
+                    {cancellingId === r._id ? t('collab.cancelling', 'Cancelling…') : t('collab.cancel', 'Cancel')}
+                  </button>
+                )}
                 <span className={`badge ${REQ_STATUS_BADGE[r.status]}`}>{r.status}</span>
                 {r.status === 'OPEN' && (
                   <span className="badge bg-amber-100 text-amber-700">{t('collab.needMore', 'Need {{n}} more', { n: need })}</span>

@@ -15,6 +15,11 @@ export const getJobTeam = (bookingId) => api.get(`/collaborations/teams/booking/
 export const getMyTeamJobs = () => api.get('/collaborations/teams/mine');
 export const checkInToTeam = (teamId) => api.post(`/collaborations/teams/${teamId}/checkin`);
 
+// Helper payments (lead worker → completed team member)
+export const getPayableTeams = () => api.get('/collaborations/teams/payable');
+export const payTeamMember = (teamId, memberId, amount) =>
+  api.post(`/collaborations/teams/${teamId}/pay`, { memberId, amount });
+
 // Profiles
 export const getCollaboratorProfile = (workerId) =>
   api.get(workerId ? `/collaborations/profile/${workerId}` : '/collaborations/profile');

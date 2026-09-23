@@ -11,6 +11,7 @@
 const JobTeam = require('../../models/JobTeam');
 const CollaborationRequest = require('../../models/CollaborationRequest');
 const Worker = require('../../models/WorkerProfile');
+const Booking = require('../../models/Booking');
 
 const getTeamForBooking = async (bookingId) =>
   JobTeam.findOne({ booking: bookingId }).populate('members.worker', 'user rating ratingCount collaborationsCount skills').populate('leadWorker', 'user');
@@ -176,6 +177,106 @@ const cancelTeam = async (requestId, leadWorkerId) => {
 };
 
 /**
+ * Close every open collaboration (and its team) for a booking once the booking
+ * itself is cancelled/expired/no-show — nothing should keep surfacing in the
+ * collaboration feeds for a job that is no longer happening.
+ */
+const closeCollaborationForBooking = async (bookingId, { status = 'CANCELLED' } = {}) => {
+  const requests = await CollaborationRequest.find({
+    booking: bookingId,
+    status: { $in: ['OPEN', 'FILLED'] },
+  });
+  for (const r of requests) {
+    r.status = status;
+    r.candidates.forEach((c) => {
+      if (c.status === 'PENDING') {
+        c.status = 'DECLINED';
+        c.respondedAt = new Date();
+      }
+    });
+    await r.save();
+  }
+  // A terminal booking has no use for a team, whether or not an open request
+  // was found — a FILLED/CANCELLED request with a lingering team must also be
+  // cleaned up so no stale job card survives the close.
+  await JobTeam.deleteMany({ booking: bookingId });
+  return { closed: requests.length };
+};
+
+/**
+ * Lead worker pays a completed team member from their wallet balance.
+ * Money is moved only after the booking is COMPLETED, using the audit-safe
+ * wallet ledger (see walletService.disburseHelperPayment). Idempotent per
+ * member via the HELPER-<team>-<member> reference.
+ */
+const payCollaborator = async ({ teamId, leadWorkerId, memberId, amount }) => {
+  const team = await JobTeam.findById(teamId);
+  if (!team) return { ok: false, error: 'Team not found' };
+  if (String(team.leadWorker) !== String(leadWorkerId)) {
+    return { ok: false, error: 'Only the lead worker can pay team members' };
+  }
+
+  const booking = await Booking.findById(team.booking).select('status bookingNumber serviceSnapshot');
+  if (!booking || booking.status !== 'COMPLETED' || !team.completed) {
+    return { ok: false, error: 'Job must be completed before paying helpers' };
+  }
+
+  const member = team.members.find((m) => String(m._id) === String(memberId));
+  if (!member) return { ok: false, error: 'Team member not found' };
+  if (member.status !== 'COMPLETED') {
+    return { ok: false, error: 'Only collaborators who completed the job can be paid' };
+  }
+
+  const { round2 } = require('../wallet/walletService');
+  const estimate = round2(member.paymentEstimate);
+  const alreadyPaid = round2(member.paidAmount);
+  const remaining = round2(estimate - alreadyPaid);
+  if (estimate > 0 && remaining <= 0) {
+    return { ok: false, error: 'This team member has already been paid in full' };
+  }
+  const pay = Math.min(round2(amount || remaining), remaining);
+  if (pay <= 0) return { ok: false, error: 'Payment amount must be greater than 0' };
+
+  const reference = `HELPER-${team._id}-${member._id}`;
+  let result;
+  try {
+    const { disburseHelperPayment } = require('../wallet/walletService');
+    result = await disburseHelperPayment({
+      bookingId: team.booking,
+      fromWorkerId: leadWorkerId,
+      toWorkerId: member.worker,
+      amount: pay,
+      reference,
+      description: booking.serviceSnapshot?.name
+        ? `Helper earnings — ${booking.serviceSnapshot.name} · ${booking.bookingNumber}`
+        : `Helper earnings · ${booking.bookingNumber}`,
+    });
+  } catch (err) {
+    return { ok: false, error: err.userMessage || err.message };
+  }
+
+  if (result.alreadyPaid) {
+    return { ok: true, alreadyPaid: true, affected: await getTeamForBooking(team.booking), paidNow: 0 };
+  }
+
+  // Record the disbursement on the member. Guarded so a concurrent duplicate
+  // request can never over-pay past what the estimate allows.
+  const newPaid = round2(alreadyPaid + result.amount);
+  await JobTeam.updateOne(
+    { _id: team._id, 'members._id': member._id, 'members.paidAmount': { $lte: alreadyPaid } },
+    { $set: { 'members.$.paidAmount': newPaid } }
+  );
+  if (estimate > 0 && newPaid >= estimate) {
+    await JobTeam.updateOne(
+      { _id: team._id, 'members._id': member._id },
+      { $set: { 'members.$.paymentPaidAt': new Date() } }
+    ).catch(() => {});
+  }
+
+  return { ok: true, affected: await getTeamForBooking(team.booking), paidNow: result.amount, memberId };
+};
+
+/**
  * When the booking is completed, credit all accepted collaborators.
  */
 const completeTeam = async (bookingId) => {
@@ -215,5 +316,7 @@ module.exports = {
   declineCollaborator,
   cancelTeam,
   completeTeam,
+  closeCollaborationForBooking,
+  payCollaborator,
   slotStateOf,
 };

@@ -192,8 +192,17 @@ const getMyCollaborationRequests = asyncHandler(async (req, res) => {
     }
   }
 
+  // A collaboration request is only live while its job can actually happen.
+  // Requests linked to a cancelled/expired/completed/no-shown booking must not
+  // keep appearing in the Opportunities feed.
+  const ACTIVE_BOOKING_STATUSES = ['REQUESTED', 'MATCHING', 'ASSIGNED', 'ACCEPTED', 'ON_THE_WAY', 'WORKER_ARRIVED', 'STARTED', 'IN_PROGRESS'];
+  const liveMerged = merged.filter((r) => {
+    if (!r.booking) return true;
+    return ACTIVE_BOOKING_STATUSES.includes(r.booking.status);
+  });
+
   const enriched = await Promise.all(
-    merged.map(async (r) => {
+    liveMerged.map(async (r) => {
       const mySlot = (r.candidates || []).find((c) => c.worker._id.toString() === workerId.toString());
       const evalResult = evalByRequest.get(r._id.toString());
       const lead = await Worker.findById(r.leadWorker ? r.leadWorker._id : null).populate('user', 'name email phone');
@@ -276,6 +285,11 @@ async function enrichOwnTeamJob(team, workerId) {
     myStatus: my ? my.status : null,
     myRole: my ? my.role : null,
     paymentEstimate: my ? my.paymentEstimate : 0,
+    paidAmount: my ? my.paidAmount || 0 : 0,
+    paymentPaidAt: my ? my.paymentPaidAt || null : null,
+    paid:
+      (my && my.paymentEstimate > 0 && (my.paidAmount || 0) >= my.paymentEstimate) ||
+      false,
     joinedAt: my ? my.joinedAt : null,
     completed: team.completed,
     booking: customer
@@ -394,6 +408,90 @@ const getJobTeam = asyncHandler(async (req, res) => {
   res.json({ success: true, data: payload });
 });
 
+// -------------------- Helper payments --------------------
+
+// Lead worker's completed jobs with outstanding/completed helper payments.
+const getPayableTeams = asyncHandler(async (req, res) => {
+  const workerId = await getWorkerId(req.user._id);
+  if (!workerId) return res.json({ success: true, data: [] });
+
+  const teams = await JobTeam.find({ leadWorker: workerId, completed: true })
+    .sort({ updatedAt: -1 })
+    .limit(30);
+
+  if (!teams.length) return res.json({ success: true, data: [] });
+
+  const bookings = await Booking.find({ _id: { $in: teams.map((t) => t.booking) } })
+    .select('status bookingNumber serviceSnapshot city address completedAt')
+    .lean();
+
+  const workerIds = new Set();
+  teams.forEach((t) => t.members.forEach((m) => workerIds.add(String(m.worker))));
+  const workerDocs = await Worker.find({ _id: { $in: [...workerIds] } })
+    .populate('user', 'name email phone')
+    .lean();
+  const workerName = (id) => {
+    const w = workerDocs.find((x) => String(x._id) === String(id));
+    return w && w.user ? w.user.name : 'Team member';
+  };
+
+  const data = teams
+    .map((team) => {
+      const booking = bookings.find((b) => String(b._id) === String(team.booking));
+      if (!booking || booking.status !== 'COMPLETED') return null;
+      const members = team.members
+        .filter((m) => m.status === 'COMPLETED')
+        .map((m) => ({
+          memberId: m._id,
+          workerId: m.worker,
+          workerName: workerName(m.worker),
+          role: m.role,
+          paymentEstimate: m.paymentEstimate,
+          paidAmount: m.paidAmount || 0,
+          paymentPaidAt: m.paymentPaidAt || null,
+          paid: m.paymentEstimate > 0 && (m.paidAmount || 0) >= m.paymentEstimate,
+          remaining: Math.round(((m.paymentEstimate || 0) - (m.paidAmount || 0)) * 100) / 100,
+        }));
+      return {
+        teamId: team._id,
+        booking: {
+          bookingNumber: booking.bookingNumber,
+          service: booking.serviceSnapshot?.name,
+          city: booking.city,
+          address: booking.address,
+          completedAt: booking.completedAt || team.updatedAt,
+        },
+        members,
+      };
+    })
+    .filter(Boolean);
+
+  res.json({ success: true, data });
+});
+
+// Lead worker pays a completed team member for a completed job.
+const payTeamMember = asyncHandler(async (req, res) => {
+  const workerId = await getWorkerId(req.user._id);
+  if (!workerId) throw new ApiError('Worker profile not found', 404);
+
+  const { memberId, amount } = req.body || {};
+  if (!memberId) throw new ApiError('memberId is required', 400);
+
+  const result = await teamFormationService.payCollaborator({
+    teamId: req.params.id,
+    leadWorkerId: workerId,
+    memberId,
+    amount,
+  });
+  if (!result.ok) throw new ApiError(result.error, 400);
+
+  res.json({
+    success: true,
+    message: 'Helper paid',
+    data: { paidNow: result.paidNow, team: result.affected },
+  });
+});
+
 // -------------------- Collaborator profile --------------------
 
 const getCollaboratorProfile = asyncHandler(async (req, res) => {
@@ -448,5 +546,7 @@ module.exports = {
   getJobTeam,
   getMyTeamJobs,
   checkInToTeam,
+  getPayableTeams,
+  payTeamMember,
   getCollaboratorProfile,
 };

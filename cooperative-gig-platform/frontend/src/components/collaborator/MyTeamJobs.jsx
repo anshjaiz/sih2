@@ -89,7 +89,11 @@ export default function MyTeamJobs() {
               <p className="text-sm text-gray-500">{job.booking?.bookingNumber}</p>
             </div>
             {job.completed ? (
-              <span className="badge bg-gray-200 text-gray-700">{t('collab.completed', 'Completed')}</span>
+              job.paid ? (
+                <span className="badge bg-emerald-100 text-emerald-700">✓ {t('collab.paidFull', 'Paid')}</span>
+              ) : (
+                <span className="badge bg-amber-100 text-amber-700">{t('collab.paymentPending', 'Payment pending')}</span>
+              )
             ) : job.joinedAt ? (
               <span className="badge bg-green-100 text-green-700">✓ {t('collab.checkedIn', 'Checked in')}</span>
             ) : (
@@ -109,6 +113,11 @@ export default function MyTeamJobs() {
             <div className="col-span-2">📍 {job.booking?.address}, {job.booking?.city}</div>
             <div>🧰 {t('collab.yourRole', 'Your role:')} {job.myRole}</div>
             <div>💰 {t('collab.yourPay', 'Your pay:')} ₹{job.paymentEstimate}</div>
+            {job.completed && !job.paid && (
+              <div className="col-span-2 text-xs text-gray-500">
+                {t('collab.payPendingHint', 'Your earnings for this job will appear in your wallet once the lead worker pays you.')}
+              </div>
+            )}
             {job.schedule && (
               <>
                 <div>📅 {fmtDate(job.schedule.date)}</div>

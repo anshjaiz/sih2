@@ -290,14 +290,14 @@ export default function Earnings() {
               <div key={t2._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
                   <p className="text-sm font-medium">
-                    {t2.type === 'JOB_EARNING' ? `💰 ${t('wallet.jobEarning')}` : t2.type === 'WITHDRAWAL' ? `🏦 ${t('wallet.withdrawal')}` : t2.type}
+                    {t2.type === 'JOB_EARNING' ? `💰 ${t('wallet.jobEarning')}` : t2.type === 'HELPER_EARNING' ? `🤝 ${t('wallet.helperEarning')}` : t2.type === 'HELPER_PAYMENT' ? `💸 ${t('wallet.helperPayment')}` : t2.type === 'WITHDRAWAL' ? `🏦 ${t('wallet.withdrawal')}` : t2.type}
                     {t2.booking?.serviceSnapshot?.name ? ` — ${t2.booking.serviceSnapshot.name}` : ''}
                   </p>
                   <p className="text-xs text-gray-500">{t2.description || ''}{t2.reference ? ` (${t2.reference})` : ''}</p>
                 </div>
                 <div className="text-right">
-                  <p className={`text-sm font-bold ${t2.type === 'JOB_EARNING' ? 'text-green-600' : 'text-gray-700'}`}>
-                    {t2.type === 'WITHDRAWAL' && t2.status === 'REVERSED' ? '+' : t2.type === 'WITHDRAWAL' ? '−' : '+'}{inr(t2.amount)}
+                  <p className={`text-sm font-bold ${t2.type === 'JOB_EARNING' || t2.type === 'HELPER_EARNING' ? 'text-green-600' : t2.type === 'HELPER_PAYMENT' ? 'text-red-600' : 'text-gray-700'}`}>
+                    {t2.type === 'WITHDRAWAL' && t2.status === 'REVERSED' ? '+' : t2.type === 'WITHDRAWAL' || t2.type === 'HELPER_PAYMENT' ? '−' : '+'}{inr(t2.amount)}
                   </p>
                   <span className={`badge ${txnStatusCls(t2.status)}`}>{t2.status}</span>
                 </div>

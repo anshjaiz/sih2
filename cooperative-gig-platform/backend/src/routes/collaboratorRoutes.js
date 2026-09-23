@@ -11,6 +11,8 @@ const {
   getJobTeam,
   getMyTeamJobs,
   checkInToTeam,
+  getPayableTeams,
+  payTeamMember,
   getCollaboratorProfile,
 } = require('../controllers/collaborator/collaboratorController');
 const { protect, authorize } = require('../middleware/authMiddleware');
@@ -31,6 +33,8 @@ router.post('/requests/:id/respond', authorize('worker'), respondCollaborationRe
 router.put('/requests/:id/cancel', authorize('worker'), cancelCollaborationRequest);
 
 // Job team
+router.get('/teams/payable', authorize('worker'), getPayableTeams);
+router.post('/teams/:id/pay', authorize('worker'), payTeamMember);
 router.get('/teams/mine', authorize('worker'), getMyTeamJobs);
 router.post('/teams/:id/checkin', authorize('worker'), checkInToTeam);
 router.get('/teams/booking/:bookingId', getJobTeam);

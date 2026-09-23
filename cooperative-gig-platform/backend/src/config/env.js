@@ -14,6 +14,12 @@ module.exports = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientURL: process.env.CLIENT_URL || 'http://localhost:5173',
   osrmBaseUrl: process.env.OSRM_BASE_URL || 'https://router.project-osrm.org',
+  // ── Scheduling timezone ───────────────────────────────────────────
+  // IANA timezone used to interpret customer chosen date + time-slot
+  // (e.g. "Afternoon" = 12:00 → 17:00) into absolute instants. Pinned here so
+  // the derived job window does NOT depend on the host/server timezone (hosts
+  // often run UTC, which shifts an Indian 12pm request to 5:30pm UTC+0).
+  timeZone: process.env.TIME_ZONE || 'Asia/Kolkata',
   // ── Pre-job navigation window ──────────────────────────────────────
   // How many minutes before a scheduled job's start time the worker may
   // begin navigation/travel (navigation_available_time = scheduled start

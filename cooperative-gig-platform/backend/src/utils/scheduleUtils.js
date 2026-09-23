@@ -4,7 +4,14 @@
  * Derive an absolute schedule window for a booking from requestedDate + timeSlot
  * (or explicit customer-provided times). The reliability scheduler uses these
  * instants — never wall-clock assumptions — for no-show detection and expiry.
+ *
+ * IMPORTANT: A customer's "Afternoon (12–4pm)" is a WALL-CLOCK window in the
+ * app's timezone, not the host's. All slot→instant derivation is therefore done
+ * in `env.timeZone` (default Asia/Kolkata) so the worker's "can start at noon"
+ * gate stays correct even when the server runs on UTC.
  */
+
+const { timeZone } = require('../config/env');
 
 const SLOT_RANGES = {
   Morning: [9, 12],
@@ -20,14 +27,69 @@ const toDate = (value) => {
   return isNaN(d.getTime()) ? null : d;
 };
 
-// "9:00 AM"-style label used in worker-facing error messages and UI hints.
+const getZoneFormatter = (tz) =>
+  new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  });
+
+// Render any instant as {year,month,day,hour,minute,second} in the given tz.
+const zonedWallClock = (date, tz) => {
+  const out = {};
+  for (const p of getZoneFormatter(tz).formatToParts(date)) {
+    if (p.type !== 'literal') out[p.type] = Number(p.value);
+  }
+  return out;
+};
+
+// Convert wall-clock fields (year, monthIndex, day, hour, minute) intended to
+// be read IN tz into an absolute instant. Dependent only on the tz, never on
+// the host's local timezone.
+const zonedFromParts = (year, monthIndex, day, hour, minute, second = 0, tz = timeZone) => {
+  const asUtc = Date.UTC(year, monthIndex, day, hour, minute, second);
+  const wall = zonedWallClock(new Date(asUtc), tz);
+  const wallAsUtc = Date.UTC(
+    wall.year,
+    wall.month - 1,
+    wall.day,
+    wall.hour,
+    wall.minute,
+    wall.second
+  );
+  return new Date(asUtc - (wallAsUtc - asUtc));
+};
+
+// Which calendar day does the requested date fall on in tz? ISO date-only
+// strings ("2026-09-23") are taken literally; anything else is parsed as an
+// instant and converted into tz (so a full browser datetime from the customer
+// maps to their intended local day).
+const getCalendarParts = (requestedDate, tz = timeZone) => {
+  if (typeof requestedDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+    const [y, m, d] = requestedDate.split('-').map(Number);
+    return { year: y, monthIndex: m - 1, day: d };
+  }
+  const dt = toDate(requestedDate);
+  if (!dt) return null;
+  const wall = zonedWallClock(dt, tz);
+  return { year: wall.year, monthIndex: wall.month - 1, day: wall.day };
+};
+
+// "9:00 AM"-style label used in worker-facing error messages and UI hints,
+// rendered in the app timezone so the server never reports a host-shifted time.
 const formatTimeLabel = (date) => {
   const d = toDate(date);
   if (!d) return '';
-  let h = d.getHours();
+  const wall = zonedWallClock(d, timeZone);
+  let h = wall.hour % 24;
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
-  const m = String(d.getMinutes()).padStart(2, '0');
+  const m = String(wall.minute).padStart(2, '0');
   return `${h}:${m} ${ampm}`;
 };
 
@@ -58,11 +120,10 @@ const deriveScheduleWindow = (requestedDate, timeSlot, { isEmergency = false, ex
   }
 
   const range = SLOT_RANGES[timeSlot] || SLOT_RANGES.Flexible;
-  const start = new Date(date);
-  start.setHours(range[0], 0, 0, 0);
-  const end = new Date(start);
-  end.setHours(range[1], 0, 0, 0);
-  if (range[1] <= range[0]) end.setDate(end.getDate() + 1);
+  const parts = getCalendarParts(requestedDate);
+  if (!parts) return { scheduledDate: null, scheduledStartTime: null, scheduledEndTime: null };
+  const start = zonedFromParts(parts.year, parts.monthIndex, parts.day, range[0], 0, 0);
+  const end = zonedFromParts(parts.year, parts.monthIndex, parts.day, range[1], 0, 0);
 
   return { scheduledDate: start, scheduledStartTime: start, scheduledEndTime: end };
 };
@@ -112,4 +173,13 @@ const getNavigationTimes = (booking, bufferMinutes = 60) => {
   };
 };
 
-module.exports = { deriveScheduleWindow, resolveScheduleTimes, getNavigationTimes, formatTimeLabel, SLOT_RANGES };
+module.exports = {
+  deriveScheduleWindow,
+  resolveScheduleTimes,
+  getNavigationTimes,
+  formatTimeLabel,
+  zonedFromParts,
+  getCalendarParts,
+  timeZone,
+  SLOT_RANGES,
+};

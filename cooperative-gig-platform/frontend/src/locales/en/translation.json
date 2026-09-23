@@ -740,7 +740,26 @@
     "tabInvites": "🤝 Opportunities",
     "subtitle": "Team up with other verified workers on nearby jobs and earn more.",
     "noInvites": "No collaboration invitations yet.",
-    "noInvitesHint": "When a lead worker needs a teammate, it will show up here in real time."
+    "noInvitesHint": "When a lead worker needs a teammate, it will show up here in real time.",
+    "tabPayments": "💸 Payments",
+    "paymentsLoadFailed": "Could not load payments",
+    "paySuccess": "Helper paid",
+    "payFailed": "Payment failed",
+    "noPayments": "No helper payments to make yet.",
+    "noPaymentsHint": "Once you lead a job with collaborators and it is completed, you can pay your helpers from here.",
+    "paymentsHint": "Pay your helpers for completed jobs. Payments come out of your available wallet balance.",
+    "estimate": "Estimate",
+    "paid": "Paid",
+    "paidInFull": "Paid in full",
+    "paying": "Paying…",
+    "pay": "Pay",
+    "cancelling": "Cancelling…",
+    "cancelConfirm": "Cancel this collaboration request?",
+    "cancelSuccessMsg": "Collaboration request cancelled",
+    "cancelFailedMsg": "Could not cancel the request",
+    "paidFull": "Paid",
+    "paymentPending": "Payment pending",
+    "payPendingHint": "Your earnings for this job will appear in your wallet once the lead worker pays you."
   },
   "welfare": {
     "title": "Welfare & Training",
@@ -926,7 +945,9 @@
     "couldNotRemoveMethod": "Could not remove payout method",
     "amount": "Amount",
     "job": "Job",
-    "availableBalanceLabel": "Available"
+    "availableBalanceLabel": "Available",
+    "helperEarning": "Helper earnings",
+    "helperPayment": "Helper payment made"
   },
   "demand": {
     "title": "AI Demand Assistant",

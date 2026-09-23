@@ -27,7 +27,7 @@ const User = require('../../models/User');
 const Worker = require('../../models/WorkerProfile');
 const JobTeam = require('../../models/JobTeam');
 const CollaborationRequest = require('../../models/CollaborationRequest');
-const { resolveScheduleTimes } = require('../../utils/scheduleUtils');
+const { resolveScheduleTimes, zonedFromParts, getCalendarParts } = require('../../utils/scheduleUtils');
 const { getSettings } = require('./reliabilityConfig');
 const {
   applyScoreChange,
@@ -117,7 +117,13 @@ const handleExpiredJobs = async (settings, now) => {
       'Job request expired',
       `Your job request ${b.bookingNumber} expired because no worker was confirmed in time. Please create a new request or contact support.`
     );
-    if (updated) results.push({ bookingId: b._id, outcome: 'EXPIRED' });
+    if (updated) {
+      results.push({ bookingId: b._id, outcome: 'EXPIRED' });
+      // Never leave OPEN collaboration invites behind for an expired job.
+      await require('../collaborator/teamFormationService')
+        .closeCollaborationForBooking(b._id, { status: 'EXPIRED' })
+        .catch((err) => console.error('[scheduler] collab cleanup on expiry error:', err.message));
+    }
   }
   return results;
 };
@@ -165,6 +171,12 @@ const handleNoShows = async (settings, now) => {
       { new: true }
     );
     if (!claimed) continue;
+
+    // The lead who no-showed is losing this job — their collaboration invites
+    // and team are obsolete and must not linger in the feeds.
+    await require('../collaborator/teamFormationService')
+      .closeCollaborationForBooking(booking._id, { status: 'CANCELLED' })
+      .catch((err) => console.error('[scheduler] collab cleanup on no-show error:', err.message));
 
     const worker = booking.worker ? await Worker.findById(booking.worker) : null;
     if (worker) {
@@ -230,6 +242,9 @@ const handleReassignmentRetries = async (settings, now) => {
         `We could not confirm a replacement for ${booking.bookingNumber}. Please request a new booking or contact support.`
       );
       results.push({ bookingId: booking._id, outcome: 'EXPIRED' });
+      await require('../collaborator/teamFormationService')
+        .closeCollaborationForBooking(booking._id, { status: 'EXPIRED' })
+        .catch((err) => console.error('[scheduler] collab cleanup on reassign-expiry error:', err.message));
       continue;
     }
     const res = await attemptReassignment(booking, { reason: 'RETRY' });
@@ -297,14 +312,16 @@ const parseClock = (clock) => {
 };
 
 /**
- * Collaboration end instant = request.date + startTime + durationHours, anchored
- * to the server-local calendar day (mirrors the booking slot derivation).
+ * Collaboration end instant = request.date + startTime + durationHours. The
+ * wall-clock parts are anchored to the app timezone (see scheduleUtils), not
+ * the host's local timezone, mirroring the booking slot derivation.
  */
 const collabEndTime = (request) => {
   if (!request || !request.date) return null;
   const [h, m] = parseClock(request.startTime);
-  const start = new Date(request.date);
-  start.setHours(h, m, 0, 0);
+  const parts = getCalendarParts(request.date);
+  if (!parts) return null;
+  const start = zonedFromParts(parts.year, parts.monthIndex, parts.day, h, m, 0);
   return new Date(start.getTime() + ((request.durationHours ?? 4) || 0) * hourMs);
 };
 

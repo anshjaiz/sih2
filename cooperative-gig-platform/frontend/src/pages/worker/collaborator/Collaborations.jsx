@@ -5,6 +5,7 @@ import CollaborationInviteCard from '../../../components/collaborator/Collaborat
 import CollaboratorProfileCard from '../../../components/collaborator/CollaboratorProfileCard';
 import MyTeamJobs from '../../../components/collaborator/MyTeamJobs';
 import MySentRequests from '../../../components/collaborator/MySentRequests';
+import TeamPayments from '../../../components/collaborator/TeamPayments';
 
 export default function Collaborations() {
   const { t } = useTranslation();
@@ -22,6 +23,7 @@ export default function Collaborations() {
     { id: 'jobs', label: t('collab.tabJobs', '✅ My Team Jobs') },
     { id: 'sent', label: t('collab.tabSent', '📨 My Requests') },
     { id: 'invites', label: invites.length ? t('collab.tabInvitesCount', '🤝 Opportunities ({{n}})', { n: invites.length }) : t('collab.tabInvites', '🤝 Opportunities') },
+    { id: 'payments', label: t('collab.tabPayments', '💸 Payments') },
   ];
 
   return (
@@ -49,6 +51,8 @@ export default function Collaborations() {
 
       {tab === 'sent' ? (
         <MySentRequests />
+      ) : tab === 'payments' ? (
+        <TeamPayments />
       ) : tab === 'invites' ? (
         loading ? (
           <div className="flex justify-center py-16">

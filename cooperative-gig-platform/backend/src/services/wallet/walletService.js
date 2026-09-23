@@ -200,6 +200,80 @@ const reverseEarning = async ({ bookingId, workerId, reference = 'REFUND' }) => 
   return { reversed: true, amount };
 };
 
+// ── Helper payment (lead worker pays a team member) --------------------
+// Moves money from the lead worker's available wallet balance into the
+// helper's wallet once the job is completed. IDEMPOTENT by reference: a
+// payment already recorded for the same (toWorker, reference) short-circuits
+// before any money moves, so a retried/duplicate pay request never pays twice.
+const disburseHelperPayment = async ({ bookingId, fromWorkerId, toWorkerId, amount, reference, description = 'Helper earnings from a team job' }) => {
+  const amt = round2(amount);
+  if (!(amt > 0)) {
+    const err = new Error('Payment amount must be greater than 0');
+    err.userMessage = 'Please enter an amount greater than 0.';
+    throw err;
+  }
+
+  const existing = await WalletTransaction.findOne({
+    worker: toWorkerId,
+    type: 'HELPER_EARNING',
+    reference,
+  }).select('_id amount');
+  if (existing) {
+    return { alreadyPaid: true, amount: round2(existing.amount || amt) };
+  }
+
+  // Hold the money atomically on the lead's wallet — only decrement if enough
+  // balance remains. This CAS is the commit point for the whole transfer.
+  await getOrCreateWallet(fromWorkerId);
+  const held = await WorkerWallet.updateOne(
+    { worker: fromWorkerId, availableBalance: { $gte: amt } },
+    { $inc: { availableBalance: -amt } }
+  );
+  if (held.modifiedCount !== 1) {
+    const err = new Error('Insufficient balance');
+    err.userMessage = "You don't have enough available balance to pay this helper yet.";
+    throw err;
+  }
+
+  try {
+    // Credit the helper's wallet.
+    await getOrCreateWallet(toWorkerId);
+    await WorkerWallet.updateOne(
+      { worker: toWorkerId },
+      { $inc: { availableBalance: amt, totalEarned: amt } }
+    );
+
+    // Audit ledger for BOTH ends.
+    await WalletTransaction.create({
+      worker: toWorkerId,
+      booking: bookingId,
+      type: 'HELPER_EARNING',
+      amount: amt,
+      status: 'COMPLETED',
+      description,
+      reference,
+    });
+    await WalletTransaction.create({
+      worker: fromWorkerId,
+      booking: bookingId,
+      type: 'HELPER_PAYMENT',
+      amount: amt,
+      status: 'COMPLETED',
+      description: `Paid a team helper for a completed job (${description})`,
+      reference,
+    });
+  } catch (err) {
+    // Roll the debited funds back so a partial failure never eats the lead's money.
+    await WorkerWallet.updateOne(
+      { worker: fromWorkerId },
+      { $inc: { availableBalance: amt } }
+    ).catch(() => {});
+    throw err;
+  }
+
+  return { paid: true, amount: amt };
+};
+
 // ── Withdrawal ----------------------------------------------------------
 
 const requestWithdrawal = async ({ workerId, amount, payoutMethodId }) => {
@@ -324,6 +398,7 @@ module.exports = {
   creditCompensation,
   releaseEarning,
   reverseEarning,
+  disburseHelperPayment,
   requestWithdrawal,
   setPayoutStatus,
   getWalletSummary,

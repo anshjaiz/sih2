@@ -24,7 +24,7 @@ const walletTransactionSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['JOB_EARNING', 'WITHDRAWAL', 'REFUND', 'ADJUSTMENT'],
+      enum: ['JOB_EARNING', 'WITHDRAWAL', 'REFUND', 'ADJUSTMENT', 'HELPER_EARNING', 'HELPER_PAYMENT'],
       required: true,
       index: true,
     },

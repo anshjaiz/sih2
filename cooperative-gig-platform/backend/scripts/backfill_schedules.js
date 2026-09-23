@@ -9,6 +9,13 @@
  * Values are derived from requestedDate + timeSlot (or the emergency window),
  * using the same deriveScheduleWindow() the create flow uses. Already-scheduled
  * bookings are untouched.
+ *
+ * Usage:
+ *   node scripts/backfill_schedules.js                 # fill only missing windows
+ *   node scripts/backfill_schedules.js --force         # re-derive ALL non-emergency
+ *                                                     # bookings in the app timezone
+ *                                                     # (fixes windows stored under a
+ *                                                     # wrong host timezone, e.g. UTC)
  */
 
 const mongoose = require('mongoose');
@@ -16,21 +23,32 @@ require('../src/models/Booking');
 const Booking = require('../src/models/Booking');
 const { deriveScheduleWindow } = require('../src/utils/scheduleUtils');
 
+const FORCE = process.argv.includes('--force');
+
 (async () => {
-  await mongoose.connect('mongodb://127.0.0.1:27017/cooperative_gig_platform');
+  const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/cooperative_gig_platform';
+  await mongoose.connect(uri);
 
-  const missing = await Booking.find({
-    $or: [
-      { scheduledStartTime: null, scheduledEndTime: null },
-      { scheduledStartTime: { $exists: false }, scheduledEndTime: { $exists: false } },
-    ],
-    requestedDate: { $ne: null },
-  }).select('_id bookingNumber requestedDate timeSlot isEmergency scheduledStartTime scheduledEndTime scheduledDate');
+  const query = FORCE
+    ? { isEmergency: { $ne: true }, timeSlot: { $ne: null }, requestedDate: { $ne: null } }
+    : {
+        $or: [
+          { scheduledStartTime: null, scheduledEndTime: null },
+          { scheduledStartTime: { $exists: false }, scheduledEndTime: { $exists: false } },
+        ],
+        requestedDate: { $ne: null },
+      };
 
-  console.log(`Bookings missing a schedule: ${missing.length}`);
+  const candidates = await Booking.find(query).select(
+    '_id bookingNumber requestedDate timeSlot isEmergency scheduledStartTime scheduledEndTime scheduledDate'
+  );
+
+  console.log(`${FORCE ? 'Rechecking' : 'Bookings missing a schedule'}: ${candidates.length}`);
   let filled = 0;
   let skipped = 0;
-  for (const b of missing) {
+  let fixed = 0;
+
+  for (const b of candidates) {
     const schedule = deriveScheduleWindow(b.requestedDate, b.timeSlot, {
       isEmergency: !!b.isEmergency,
     });
@@ -38,8 +56,20 @@ const { deriveScheduleWindow } = require('../src/utils/scheduleUtils');
       skipped++;
       continue;
     }
+
+    const storedStart = b.scheduledStartTime ? b.scheduledStartTime.getTime() : null;
+    const storedEnd = b.scheduledEndTime ? b.scheduledEndTime.getTime() : null;
+    const derivedStart = schedule.scheduledStartTime.getTime();
+    const derivedEnd = schedule.scheduledEndTime.getTime();
+
+    if (!FORCE && storedStart !== null) continue; // legacy missing-only mode
+    if (FORCE && storedStart === derivedStart && storedEnd === derivedEnd) {
+      skipped++; // already correct
+      continue;
+    }
+
     await Booking.updateOne(
-      { _id: b._id, scheduledStartTime: null },
+      { _id: b._id },
       {
         $set: {
           scheduledDate: schedule.scheduledDate,
@@ -48,9 +78,14 @@ const { deriveScheduleWindow } = require('../src/utils/scheduleUtils');
         },
       }
     );
-    filled++;
+    if (storedStart === null) filled++;
+    else fixed++;
   }
 
-  console.log(`✓ Backfilled ${filled} booking(s)${skipped ? ` (skipped ${skipped} with no derivable window)` : ''}`);
+  const summary = [];
+  if (filled) summary.push(`${filled} filled`);
+  if (fixed) summary.push(`${fixed} corrected`);
+  if (skipped) summary.push(`${skipped} skipped`);
+  console.log(`✓ Done${summary.length ? ': ' + summary.join(', ') : ''}`);
   await mongoose.disconnect();
 })().catch((e) => { console.error(e.stack); process.exit(1); });

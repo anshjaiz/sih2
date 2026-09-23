@@ -38,6 +38,13 @@ const jobTeamSchema = new mongoose.Schema(
           type: Number,
           default: 0,
         },
+        // How much the lead worker has actually paid to this member.
+        paidAmount: {
+          type: Number,
+          default: 0,
+        },
+        // When this member was last paid (reset only by a fresh disbursement).
+        paymentPaidAt: Date,
         invitedAt: Date,
         acceptedAt: Date,
         joinedAt: Date,
